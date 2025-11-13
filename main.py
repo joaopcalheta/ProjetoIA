@@ -10,7 +10,7 @@ OBSTACLE_STOP_DISTANCE_CM = 10
 OBJECT_SEARCH_DISTANCE_CM = 45
 LINE_COLOR_NAME = 'Red'
 SPIN_SEARCH_SPEED = 15
-SEARCH_TIME_LEFT_S = 0.3
+SEARCH_TIME_LEFT_S = 0.5
 SEARCH_TIME_RIGHT_S = 3.0
 
 
@@ -29,10 +29,12 @@ def _follow_straight_on_line(tank_pair, gyro, base_speed, kp, target_angle):
     tank_pair.on(SpeedPercent(left_speed), SpeedPercent(right_speed))
 
 
-def _perform_search_spin(tank_pair, color_sensor, us_sensor, duration_s, left_speed, right_speed):
+def _perform_search_spin(tank_pair, color_sensor, us_sensor, duration_s, left_speed, right_speed, distance_check_func):
     """
     Gira numa direção específica por um tempo_s, procurando a linha ou um obstáculo.
-    Retorna 'FOUND_LINE', 'FOUND_OBSTACLE', ou 'NOT_FOUND'.
+    Retorna 'FOUND_LINE', 'TARGET_REACHED', ou 'NOT_FOUND'.
+    
+    Recebe 'distance_check_func' para saber quando parar.
     """
     tank_pair.on(SpeedPercent(left_speed), SpeedPercent(right_speed))
     start_search_time = time()
@@ -40,18 +42,21 @@ def _perform_search_spin(tank_pair, color_sensor, us_sensor, duration_s, left_sp
     while (time() - start_search_time) < duration_s:
         if color_sensor.color_name == LINE_COLOR_NAME:
             return 'FOUND_LINE'
-        if us_sensor.distance_centimeters <= OBSTACLE_STOP_DISTANCE_CM:
-            return 'FOUND_OBSTACLE'
+        
+        # MUDANÇA AQUI: Usa a função de verificação em vez de um valor fixo
+        current_distance = us_sensor.distance_centimeters
+        if distance_check_func(current_distance):
+            return 'TARGET_REACHED'
+            
         sleep(0.01)
         
     return 'NOT_FOUND'
 
 
-def _search_for_lost_line(tank_pair, color_sensor, us_sensor, gyro):
+def _search_for_lost_line(tank_pair, color_sensor, us_sensor, gyro, distance_check_func):
     """
     Executa a lógica de "sweep" (varredura) para reencontrar a linha.
-    Para o robô, procura à esquerda e depois à direita.
-    Retorna 'FOUND_LINE', 'FOUND_OBSTACLE', ou 'NOT_FOUND'.
+    Recebe 'distance_check_func' e passa-a para '_perform_search_spin'.
     """
     tank_pair.off()
     print("...Perdi o 'Red'. A procurar (Sweep Esquerda)...")
@@ -61,7 +66,8 @@ def _search_for_lost_line(tank_pair, color_sensor, us_sensor, gyro):
         tank_pair, color_sensor, us_sensor,
         duration_s=SEARCH_TIME_LEFT_S,
         left_speed=SPIN_SEARCH_SPEED,
-        right_speed=-SPIN_SEARCH_SPEED
+        right_speed=-SPIN_SEARCH_SPEED,
+        distance_check_func=distance_check_func # MUDANÇA AQUI
     )
     
     if search_result == 'FOUND_LINE':
@@ -69,9 +75,10 @@ def _search_for_lost_line(tank_pair, color_sensor, us_sensor, gyro):
         gyro.reset()
         return 'FOUND_LINE'
     
-    if search_result == 'FOUND_OBSTACLE':
-        print("...Objeto detetado durante a procura (Esq).")
-        return 'FOUND_OBSTACLE'
+    # MUDANÇA AQUI: Renomeado de 'FOUND_OBSTACLE'
+    if search_result == 'TARGET_REACHED':
+        print("...Alvo de distancia atingido durante a procura (Esq).")
+        return 'TARGET_REACHED'
 
     # 4. PROCURA DIREITA
     print("...Nao encontrou (Esq). A procurar (Sweep Direita)...")
@@ -79,7 +86,8 @@ def _search_for_lost_line(tank_pair, color_sensor, us_sensor, gyro):
         tank_pair, color_sensor, us_sensor,
         duration_s=SEARCH_TIME_RIGHT_S,
         left_speed=-SPIN_SEARCH_SPEED,
-        right_speed=SPIN_SEARCH_SPEED
+        right_speed=SPIN_SEARCH_SPEED,
+        distance_check_func=distance_check_func # MUDANÇA AQUI
     )
 
     if search_result == 'FOUND_LINE':
@@ -87,9 +95,9 @@ def _search_for_lost_line(tank_pair, color_sensor, us_sensor, gyro):
         gyro.reset()
         return 'FOUND_LINE'
         
-    if search_result == 'FOUND_OBSTACLE':
-        print("...Objeto detetado durante a procura (Dir).")
-        return 'FOUND_OBSTACLE'
+    if search_result == 'TARGET_REACHED':
+        print("...Alvo de distancia atingido durante a procura (Dir).")
+        return 'TARGET_REACHED'
 
     # 5. FALHOU A PROCURA
     print("!!! PROCURA FALHOU. Linha perdida. A parar.")
@@ -98,57 +106,102 @@ def _search_for_lost_line(tank_pair, color_sensor, us_sensor, gyro):
 
 def follow_line_until_obstacle(tank_pair, gyro, color_sensor, us_sensor, base_speed, kp):
     """
-    Função principal de seguimento de linha.
-    Segue a linha usando o giroscópio e ativa a procura se a perder.
-    Para se o sensor US detetar algo a < OBSTACLE_STOP_DISTANCE_CM.
+    Função de APROXIMAÇÃO.
+    Segue a linha até a distância ser <= OBSTACLE_STOP_DISTANCE_CM.
     """
-    # MUDANÇA AQUI: Trocado f-string por .format()
-    print("A iniciar seguimento (Modo: Gyro + Sweep) a {}%...".format(base_speed))
-    print("KP (Ganho): {}".format(kp))
+    print("A iniciar seguimento (Modo: Aproximacao)...")
+    print("Velocidade: {}. Alvo: <= {}cm".format(base_speed, OBSTACLE_STOP_DISTANCE_CM))
     
     gyro.reset()
     target_angle = 0
     
-    while us_sensor.distance_centimeters > OBSTACLE_STOP_DISTANCE_CM:
+    # MUDANÇA AQUI: Define a condição de paragem específica (APROXIMAR)
+    stop_condition_check = lambda dist: dist <= OBSTACLE_STOP_DISTANCE_CM
+    
+    # MUDANÇA AQUI: O loop continua enquanto a condição NÃO for atingida
+    while not stop_condition_check(us_sensor.distance_centimeters):
         
         if color_sensor.color_name == LINE_COLOR_NAME:
-            # 1. ESTÁ NA LINHA
             _follow_straight_on_line(tank_pair, gyro, base_speed, kp, target_angle)
         
         else:
             # 2. PERDEU A LINHA
-            search_status = _search_for_lost_line(tank_pair, color_sensor, us_sensor, gyro)
+            # MUDANÇA AQUI: Passa a função de verificação para a procura
+            search_status = _search_for_lost_line(
+                tank_pair, color_sensor, us_sensor, gyro,
+                distance_check_func=stop_condition_check
+            )
             
             if search_status == 'FOUND_LINE':
-                target_angle = 0  # O Gyro foi resetado na função de procura
+                target_angle = 0
                 continue
             else:
-                # 'FOUND_OBSTACLE' ou 'NOT_FOUND'
-                break  # Sai do loop principal de seguimento
+                # 'TARGET_REACHED' (obstáculo encontrado) ou 'NOT_FOUND' (linha perdida)
+                break 
 
         sleep(0.01)
 
     # --- PARAGEM ---
     tank_pair.off()
     
-    if us_sensor.distance_centimeters <= OBSTACLE_STOP_DISTANCE_CM:
-        # MUDANÇA AQUI: Trocado f-string por .format()
+    if stop_condition_check(us_sensor.distance_centimeters):
         print("!!! Objeto a < {}cm detetado. A parar.".format(OBSTACLE_STOP_DISTANCE_CM))
     else:
         print("!!! Seguimento terminado (linha perdida).")
+
+
+### --- NOVA FUNÇÃO --- ###
+def follow_line_return_to_distance(tank_pair, gyro, color_sensor, us_sensor, return_speed, kp, target_distance_cm):
+    """
+    Função de RETORNO.
+    Segue a linha até a distância ser >= target_distance_cm.
+    """
+    print("A iniciar seguimento (Modo: Retorno)...")
+    print("Velocidade: {}. Alvo: >= {}cm".format(return_speed, target_distance_cm))
+    
+    gyro.reset()
+    target_angle = 0
+    
+    # Define a condição de paragem específica (RETORNAR)
+    stop_condition_check = lambda dist: dist >= target_distance_cm
+    
+    # O loop continua enquanto a condição NÃO for atingida
+    while not stop_condition_check(us_sensor.distance_centimeters):
         
-    if color_sensor.color_name != LINE_COLOR_NAME:
-        print("...Parou fora da linha vermelha.")
+        if color_sensor.color_name == LINE_COLOR_NAME:
+            _follow_straight_on_line(tank_pair, gyro, return_speed, kp, target_angle)
+        
+        else:
+            # 2. PERDEU A LINHA
+            search_status = _search_for_lost_line(
+                tank_pair, color_sensor, us_sensor, gyro,
+                distance_check_func=stop_condition_check
+            )
+            
+            if search_status == 'FOUND_LINE':
+                target_angle = 0
+                continue
+            else:
+                # 'TARGET_REACHED' (distância inicial) ou 'NOT_FOUND' (linha perdida)
+                break 
+        sleep(0.01)
+
+    # --- PARAGEM ---
+    tank_pair.off()
+    
+    if stop_condition_check(us_sensor.distance_centimeters):
+        print("!!! Retorno concluido. Distancia: {:.1f}cm".format(us_sensor.distance_centimeters))
     else:
-        print("...Parou em cima da linha vermelha.")
+        print("!!! Retorno falhou (linha perdida).")
+### --- FIM DA NOVA FUNÇÃO --- ###
 
 
 def run_challenge(tank_pair, color_sensor, us_sensor, gyro, spin_speed, forward_speed):
     """
     Loop principal do desafio autônomo, gerindo os estados.
+    'forward_speed' é a velocidade de aproximação (negativa)
     """
     KP_GAIN = 1.5 
-    # MUDANÇA AQUI: Trocado f-string por .format()
     print("A iniciar desafio... (Giro: {}%, Avanco: {}%)".format(spin_speed, forward_speed))
     
     try:
@@ -170,25 +223,44 @@ def run_challenge(tank_pair, color_sensor, us_sensor, gyro, spin_speed, forward_
             
             if distance_cm < OBJECT_SEARCH_DISTANCE_CM:
                 # Objeto ENCONTRADO.
-                # MUDANÇA AQUI: Trocado f-string por .format()
                 print(">>> Objeto detetado a {:.1f} cm.".format(distance_cm))
                 
-                # --- ESTADO 3: SEGUIR A LINHA ATE AO OBJETO ---
+                # --- ESTADO 3: SEGUIR A LINHA ATE AO OBJETO (APROXIMAR) ---
                 print("--- ESTADO 3: A seguir linha/aproximar do objeto...")
                 follow_line_until_obstacle(
                     tank_pair=tank_pair,
                     gyro=gyro, 
                     color_sensor=color_sensor,
                     us_sensor=us_sensor,
-                    base_speed=forward_speed,
+                    base_speed=forward_speed, # Velocidade negativa (ex: -20)
                     kp=KP_GAIN
                 )
                 
+                ### --- MUDANÇA AQUI: ESTADO 3.5 (RETORNO) --- ###
+                print("...Aproximacao concluida. A iniciar retorno...")
+                sleep(0.5) # Pausa dramática
+                
+                # A velocidade de retorno é o oposto da de aproximação
+                return_speed = forward_speed * -1 # (ex: -20 * -1 = 20)
+                
+                # O alvo é a distância medida no ESTADO 2
+                start_distance_cm = distance_cm 
+                
+                follow_line_return_to_distance(
+                    tank_pair=tank_pair,
+                    gyro=gyro, 
+                    color_sensor=color_sensor,
+                    us_sensor=us_sensor,
+                    return_speed=return_speed, # Velocidade positiva (ex: 20)
+                    kp=KP_GAIN,
+                    target_distance_cm=start_distance_cm-0.8
+                )
+                ### --- FIM DA MUDANÇA --- ###
+
                 print("Acao terminada. A voltar ao ESTADO 1.")
                 
             else:
                 # Caminho LIVRE.
-                # MUDANÇA AQUI: Trocado f-string por .format()
                 print(">>> Caminho livre (objeto a {:.1f} cm). A sair da linha atual...".format(distance_cm))
                 
                 # --- ESTADO 4: SAIR DA LINHA ATUAL ---
@@ -204,7 +276,6 @@ def run_challenge(tank_pair, color_sensor, us_sensor, gyro, spin_speed, forward_
     except KeyboardInterrupt:
         print("\nPrograma interrompido pelo utilizador.")
     except Exception as e:
-        # MUDANÇA AQUI: Trocado f-string por .format()
         print("Ocorreu um erro durante o ciclo: {}".format(e))
     finally:
         tank_pair.off()
@@ -243,7 +314,6 @@ def initialize_hardware():
         return tank_pair, color_sensor, us_sensor, gyro_sensor
 
     except Exception as e:
-        # MUDANÇA AQUI: Trocado f-string por .format()
         print("Ocorreu um erro fatal na inicializacao: {}".format(e))
         print("Verifique se os sensores estao nas portas corretas (1, 2, e 4) e motores (B, C).")
         return None, None, None, None
@@ -263,7 +333,7 @@ def main():
             us_sensor=us_sensor, 
             gyro=gyro_sensor,
             spin_speed=20,
-            forward_speed=-20  # Manteve a velocidade negativa (marcha-atrás)
+            forward_speed=-20  # Velocidade de aproximação (marcha-atrás)
         )
     else:
         print("Falha ao inicializar hardware. A sair.")
