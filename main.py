@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 
 from time import sleep, time
-from ev3dev2.motor import (SpeedPercent, MoveTank, OUTPUT_B, OUTPUT_C)
+from ev3dev2.motor import (SpeedPercent, MoveTank, MediumMotor, OUTPUT_A, OUTPUT_B, OUTPUT_C)
 from ev3dev2.sensor.lego import ColorSensor, UltrasonicSensor, GyroSensor
 from ev3dev2.sensor import INPUT_1, INPUT_2, INPUT_4
+from ev3dev2.sound import Sound
 
 # --- Constantes de Comportamento ---
 OBSTACLE_STOP_DISTANCE_CM = 10     # Distância para parar à frente do inimigo
@@ -14,6 +15,58 @@ LINE_COLOR_NAME = 'Red'            # Cor da linha a seguir até ao inimigo
 SPIN_SEARCH_SPEED = 15             # Velocidade de rotação durante a procura da linha  
 SEARCH_TIME_LEFT_S = 0.5           # Duração da procura para a esquerda
 SEARCH_TIME_RIGHT_S = 3.0          # Duração da procura para a direita
+
+
+# Função para tocar ficheiro WAV
+def play_wav(file_path, volume=100):
+    print("a tocar som")
+    speaker = Sound()
+    speaker.set_volume(volume)
+    speaker.play_file(file_path)
+
+
+# Função para atacar com a grua
+    # Gira até encontra a linha vermelha novamente (aprox. 180 graus)
+    # Ativa o motor (grua)
+    # Volta a girar até encontra a linha vermelha, regressando à posição original (aprox. 180 graus)
+def perform_attack_maneuver(tank_pair, weapon_motor, color_sensor):
+    
+    print("A rodar 180 graus (a procura da linha vermelha)...")
+    
+    # Começa a girar para a direita
+    tank_pair.on(SpeedPercent(20), SpeedPercent(-20))
+    
+    # IMPORTANTE: Espera um pouco 'cego' para garantir que sai da linha onde está atualmente
+    # Se não fizermos isto, ele deteta a linha imediatamente e para.
+    sleep(1.0) 
+    
+    # Continua a girar até ver Vermelho
+    while color_sensor.color_name != LINE_COLOR_NAME:
+        sleep(0.01)
+    
+    tank_pair.off()
+    print("Posicao de ataque alcancada (Linha encontrada).")
+
+    # --- FASE 2: EXECUTAR ATAQUE ---
+    print("A ativar arma...")
+    # Roda a 100% de velocidade por 2 segundos
+    weapon_motor.on_for_seconds(SpeedPercent(100), seconds=2)
+    
+    # --- FASE 3: VOLTAR À POSIÇÃO INICIAL ---
+    print("Ataque concluido. A voltar a posicao inicial...")
+    
+    # Gira no sentido oposto (para a esquerda) para desfazer a rotação
+    tank_pair.on(SpeedPercent(-20), SpeedPercent(20))
+    
+    # Espera 'cega' para sair da linha atual
+    sleep(1.0)
+    
+    # Continua a girar até ver Vermelho de novo
+    while color_sensor.color_name != LINE_COLOR_NAME:
+        sleep(0.01)
+        
+    tank_pair.off()
+    print("Posicao inicial recuperada.")
 
 
 # Função para o robot seguir em linha reta com correção do giroscópio
@@ -27,8 +80,6 @@ def _follow_straight_on_line(tank_pair, gyro, base_speed, kp, target_angle):
 
 
 # Função para realizar a procura girando
-    # Gira até ficar em direção a um slot de inimigo (encontra a linha vermelha)
-    # Quando encontra a linha, verifica se existe um inimigo no slot em frente (deteta distancia)
 def _perform_search_spin(tank_pair, color_sensor, us_sensor, duration_s, left_speed, right_speed, distance_check_func):
     tank_pair.on(SpeedPercent(left_speed), SpeedPercent(right_speed))
     start_search_time = time()
@@ -43,13 +94,9 @@ def _perform_search_spin(tank_pair, color_sensor, us_sensor, duration_s, left_sp
 
 
 # Função para reorientar o robot quando perde a linha vermelha
-    # Tenta encontrar a linha girando primeiro para a esquerda, depois para a direita
-    # Se encontrar linha vermelha, retorna 'FOUND_LINE'
-    # Se encontrar um inimigo ao regressar à linha (deteta distância), retorna 'TARGET_REACHED'
-    # Se não encontrar linha vermelha, retorna 'NOT_FOUND'
 def _search_for_lost_line(tank_pair, color_sensor, us_sensor, gyro, distance_check_func):
     tank_pair.off()
-    print("Perdi a linha vermelha. Vou procurar à esquerda...")
+    print("Perdi a linha vermelha. Vou procurar a esquerda...")
     search_result = _perform_search_spin(
         tank_pair, color_sensor, us_sensor,
         duration_s=SEARCH_TIME_LEFT_S,
@@ -58,13 +105,13 @@ def _search_for_lost_line(tank_pair, color_sensor, us_sensor, gyro, distance_che
         distance_check_func=distance_check_func
     )
     if search_result == 'FOUND_LINE':
-        print("Encontrei a linha à esquerda!")
+        print("Encontrei a linha a esquerda!")
         gyro.reset()
         return 'FOUND_LINE'
     if search_result == 'TARGET_REACHED':
-        print("Encontrei um inimigo ao regressar à linha!")
+        print("Encontrei um inimigo ao regressar a linha!")
         return 'TARGET_REACHED'
-    print("Não encontrei à esquerda. Vou tentar à direita...")
+    print("Nao encontrei a esquerda. Vou tentar a direita...")
     search_result = _perform_search_spin(
         tank_pair, color_sensor, us_sensor,
         duration_s=SEARCH_TIME_RIGHT_S,
@@ -73,21 +120,19 @@ def _search_for_lost_line(tank_pair, color_sensor, us_sensor, gyro, distance_che
         distance_check_func=distance_check_func
     )
     if search_result == 'FOUND_LINE':
-        print("Encontrei a linha à direita!")
+        print("Encontrei a linha a direita!")
         gyro.reset()
         return 'FOUND_LINE'
     if search_result == 'TARGET_REACHED':
-        print("Encontrei um inimigo ao regressar à linha!")
+        print("Encontrei um inimigo ao regressar a linha!")
         return 'TARGET_REACHED'
-    print("Perdi-me! Não consigo encontrar a linha vermelha!")
+    print("Perdi-me! Nao consigo encontrar a linha vermelha!")
     return 'NOT_FOUND'
 
 
 # Função para seguir a linha até estar perto do inimigo
-    # Pára quando estiver a OBJECT_SEARCH_DISTANCE_CM ou menos do inimigo
-    # Pára se perder a linha
 def follow_line_until_obstacle(tank_pair, gyro, color_sensor, us_sensor, base_speed, kp):
-    print("Estou a ir em direção ao inimigo... Vou parar quando estiver a <= {}cm.".format(OBSTACLE_STOP_DISTANCE_CM))
+    print("Estou a ir em direcao ao inimigo... Vou parar quando estiver a <= {}cm.".format(OBSTACLE_STOP_DISTANCE_CM))
     gyro.reset()
     target_angle = 0
     stop_condition_check = lambda dist: dist <= OBSTACLE_STOP_DISTANCE_CM
@@ -107,15 +152,12 @@ def follow_line_until_obstacle(tank_pair, gyro, color_sensor, us_sensor, base_sp
         sleep(0.01)
     tank_pair.off()
     if stop_condition_check(us_sensor.distance_centimeters):
-        print("Avanço concluído: Inimigo detetado a < {}cm. A parar...".format(OBSTACLE_STOP_DISTANCE_CM))
+        print("Avanco concluido: Inimigo detetado a < {}cm. A parar...".format(OBSTACLE_STOP_DISTANCE_CM))
     else:
-        print("Perdi a linha vermelha enquanto ia em direção ao inimigo! A parar...")
+        print("Perdi a linha vermelha enquanto ia em direcao ao inimigo! A parar...")
 
 
 # Função para regressar ao centro após se aproximar do inimigo
-    # Pára quando estiver a target_distance_cm ou mais do inimigo
-    # target_distance_cm é a distância inicial que tinha ao inimigo antes de se aproximar menos 0.8cm
-    # Pára se perder a linha
 def follow_line_return_to_distance(tank_pair, gyro, color_sensor, us_sensor, return_speed, kp, target_distance_cm):
     print("Estou a regressar do inimigo... Vou parar quando estiver a >= {}cm.".format(target_distance_cm))
     gyro.reset()
@@ -137,7 +179,7 @@ def follow_line_return_to_distance(tank_pair, gyro, color_sensor, us_sensor, ret
         sleep(0.01)
     tank_pair.off()
     if stop_condition_check(us_sensor.distance_centimeters):
-        print("Retorno concluído: Inimigo detetado a >= {:.1f}cm. A parar...".format(us_sensor.distance_centimeters))
+        print("Retorno concluido: Inimigo detetado a >= {:.1f}cm. A parar...".format(us_sensor.distance_centimeters))
     else:
         print("Perdi a linha vermelha enquanto regressava do inimigo! A parar...")
 
@@ -146,13 +188,14 @@ def follow_line_return_to_distance(tank_pair, gyro, color_sensor, us_sensor, ret
 def _leave_current_line(tank_pair, color_sensor, spin_speed):
     print("A sair da linha vermelha atual...")
     tank_pair.on(left_speed=SpeedPercent(spin_speed * -1), right_speed=SpeedPercent(spin_speed))
-    while color_sensor.color_name == LINE_COLOR_NAME: # continua a girar enquanto ainda ver a linha vermelha
+    while color_sensor.color_name == LINE_COLOR_NAME: 
         sleep(0.01)
     print("Fora da linha.")
 
 
 # Função com a lógica principal do robot (loop)
-def run_challenge(tank_pair, color_sensor, us_sensor, gyro, spin_speed, forward_speed):
+# ATENÇÃO: Adicionado medium_motor aos argumentos
+def run_challenge(tank_pair, medium_motor, color_sensor, us_sensor, gyro, spin_speed, forward_speed):
 
     KP_GAIN = 1.5 
     
@@ -168,41 +211,44 @@ def run_challenge(tank_pair, color_sensor, us_sensor, gyro, spin_speed, forward_
             
             # Estado 2 - Encontra a linha, pára e verifica se há inimigo no slot em frente
             tank_pair.off()
-            print("--- ESTADO 2: Linha vermelha detetada! A parar e a verificar existência de inimigo... ---")
+            print("--- ESTADO 2: Linha vermelha detetada! A parar e a verificar existencia de inimigo... ---")
             sleep(0.1) 
             distance_cm = us_sensor.distance_centimeters
-            # Verifica se há inimigo no slot em frente
+            
+            print(distance_cm)
             if distance_cm < OBJECT_SEARCH_DISTANCE_CM:
 
-
-                # Estado 3 - Deteta inimigo em frente e aproxima-se do inimigo seguindo a linha
-                print("--- ESTADO 3: Inimigo detetado a {:.1f} cm! A aproximar-se do inimigo...".format(distance_cm))
+                # Estado 3 - Deteta inimigo em frente e aproxima-se
+                print("--- ESTADO 3: Inimigo detetado a {:.1f} cm! A aproximar-se...".format(distance_cm))
                 follow_line_until_obstacle(
                     tank_pair=tank_pair, gyro=gyro, color_sensor=color_sensor,
                     us_sensor=us_sensor, base_speed=forward_speed, kp=KP_GAIN
                 )
-                
+                # --- EXECUTAR O ATAQUE ---
+                # Agora passamos o color_sensor em vez do gyro
+                perform_attack_maneuver(tank_pair, medium_motor, color_sensor)
+                # -------------------------
 
                 # Estado 4 - Regressa do inimigo seguindo a linha
-                print("--- ESTADO 4: Fim de aproximação ao inimigo! A regressar para o centro...")
+                
+                play_wav("nein.wav")
+                print("--- ESTADO 4: Fim de ataque! A regressar para o centro...")
                 sleep(0.5)
                 return_speed = forward_speed * -1 
                 start_distance_cm = distance_cm 
+
                 follow_line_return_to_distance(
                     tank_pair=tank_pair, gyro=gyro, color_sensor=color_sensor,
                     us_sensor=us_sensor, return_speed=return_speed, kp=KP_GAIN,
-                    target_distance_cm=start_distance_cm -0.8
+                    target_distance_cm=start_distance_cm - 0.8
                 )
                 
                 # Ignora a linha atual para voltar ao ESTADO 1
                 _leave_current_line(tank_pair, color_sensor, spin_speed)
 
             else:
-
                 # Nenhum inimigo detetado em frente
                 print("Nenhum inimigo detetado em {:.1f} cm.".format(distance_cm))
-                
-                # Ignora a linha atual para voltar ao ESTADO 1
                 _leave_current_line(tank_pair, color_sensor, spin_speed)
             
             sleep(1.0) # Pausa entre ciclos
@@ -213,42 +259,57 @@ def run_challenge(tank_pair, color_sensor, us_sensor, gyro, spin_speed, forward_
         print("Ocorreu um erro durante o ciclo: {}".format(e))
     finally:
         tank_pair.off()
-        print("Motores de locomocao parados.")
+        medium_motor.off()
+        print("Motores parados.")
 
 
 # Função para inicializar do hardware
 def initialize_hardware():
     try:
+        # Inicializa Motores de Tanque
         tank_pair = MoveTank(OUTPUT_B, OUTPUT_C)
-        print("Motores (B, C): OK")
+        print("Motores Tanque (B, C): OK")
+        
+        # Inicializa Motor Médio (Arma) na Porta A
+        medium_motor = MediumMotor(OUTPUT_A)
+        print("Motor Medio (A): OK")
+
+        # Inicializa Sensores
         color_sensor = ColorSensor(INPUT_4)
         color_sensor.mode = 'COL-COLOR'
         print("Sensor de Cor (Porta 4): OK.")
+        
         us_sensor = UltrasonicSensor(INPUT_1)
         us_sensor.mode = 'US-DIST-CM'
         print("Sensor Ultrassonico (Porta 1): OK.")
+        
         gyro_sensor = GyroSensor(INPUT_2)
         gyro_sensor.mode = 'GYRO-ANG' 
         print("Sensor Giroscopio (Porta 2): OK.")
+        
         sleep(2.0) 
         gyro_sensor.reset()
-        return tank_pair, color_sensor, us_sensor, gyro_sensor
+        
+        # Retorna o motor médio também
+        return tank_pair, medium_motor, color_sensor, us_sensor, gyro_sensor
     except Exception as e:
-        print("Ocorreu um erro na inicializacao dos sensores e motores (verificar ligações): {}".format(e))
-        return None, None, None, None
+        print("Ocorreu um erro na inicializacao dos sensores e motores: {}".format(e))
+        return None, None, None, None, None
 
 
 def main():
-    tank_pair, color_sensor, us_sensor, gyro_sensor = initialize_hardware() # Inicializa hardware
+    # Desempacota as variáveis corretamente, incluindo medium_motor
+    tank_pair, medium_motor, color_sensor, us_sensor, gyro_sensor = initialize_hardware()
     
     if tank_pair is not None:
         run_challenge(
             tank_pair=tank_pair,
+            medium_motor=medium_motor, # Passa o motor médio para a função principal
             color_sensor=color_sensor, 
             us_sensor=us_sensor, 
             gyro=gyro_sensor,
-            spin_speed=20,      # Velocidade de rotação
-            forward_speed=-20   # Velocidade de avanço
+            spin_speed=20,
+            forward_speed=-20
         )
     else:
         print("Falha ao inicializar hardware. A sair...")
