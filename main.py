@@ -7,7 +7,8 @@ from ev3dev2.sensor import INPUT_1, INPUT_2, INPUT_4
 from ev3dev2.sound import Sound
 
 # --- Constantes de Comportamento ---
-OBSTACLE_STOP_DISTANCE_CM = 10     # Distância para parar à frente do inimigo
+OBSTACLE_STOP_DISTANCE_CM = 8
+     # Distância para parar à frente do inimigo
 OBJECT_SEARCH_DISTANCE_CM = 45     # Distância para considerar "inimigo encontrado"
 LINE_COLOR_NAME = 'Red'            # Cor da linha a seguir até ao inimigo
 
@@ -16,58 +17,66 @@ SPIN_SEARCH_SPEED = 15             # Velocidade de rotação durante a procura d
 SEARCH_TIME_LEFT_S = 0.5           # Duração da procura para a esquerda
 SEARCH_TIME_RIGHT_S = 3.0          # Duração da procura para a direita
 
+# FUNÇÕES DE ATAQUES
 
-# Função para tocar ficheiro WAV
+# Função para tocar ficheiro WAV (ataque de som)
 def play_wav(file_path, volume=100):
-    print("a tocar som")
-    speaker = Sound()
-    speaker.set_volume(volume)
-    speaker.play_file(file_path)
+    # print("a tocar som") # Comentado para não poluir o log
+    try:
+        speaker = Sound()
+        speaker.set_volume(volume)
+        speaker.play_file(file_path)
+    except:
+        pass
+
+# Função para realizar um ataque por toque
+def perform_touch_attack(tank_pair):
+    print(">>> INICIAR ATAQUE DE TOQUE <<<")
+    
+    # 1. Investida: Avança 100% de velocidade
+    tank_pair.on_for_rotations(SpeedPercent(-70), SpeedPercent(-70), 0.2)
+    sleep(0.2)
+    # 2. Recuo: Volta para trás a mesma distância
+    tank_pair.on_for_rotations(SpeedPercent(70), SpeedPercent(70), 0.2)
+    print(">>> Ataque de toque concluido. <<<")
 
 
-# Função para atacar com a grua
+ # Função para atacar com a grua
     # Gira até encontra a linha vermelha novamente (aprox. 180 graus)
     # Ativa o motor (grua)
     # Volta a girar até encontra a linha vermelha, regressando à posição original (aprox. 180 graus)
 def perform_attack_maneuver(tank_pair, weapon_motor, color_sensor):
-    
     print("A rodar 180 graus (a procura da linha vermelha)...")
-    
     # Começa a girar para a direita
     tank_pair.on(SpeedPercent(20), SpeedPercent(-20))
-    
     # IMPORTANTE: Espera um pouco 'cego' para garantir que sai da linha onde está atualmente
     # Se não fizermos isto, ele deteta a linha imediatamente e para.
-    sleep(1.0) 
-    
+    sleep(1.0)
     # Continua a girar até ver Vermelho
     while color_sensor.color_name != LINE_COLOR_NAME:
         sleep(0.01)
-    
     tank_pair.off()
     print("Posicao de ataque alcancada (Linha encontrada).")
-
     # --- FASE 2: EXECUTAR ATAQUE ---
     print("A ativar arma...")
     # Roda a 100% de velocidade por 2 segundos
     weapon_motor.on_for_seconds(SpeedPercent(100), seconds=2)
-    
     # --- FASE 3: VOLTAR À POSIÇÃO INICIAL ---
     print("Ataque concluido. A voltar a posicao inicial...")
-    
     # Gira no sentido oposto (para a esquerda) para desfazer a rotação
     tank_pair.on(SpeedPercent(-20), SpeedPercent(20))
-    
     # Espera 'cega' para sair da linha atual
     sleep(1.0)
-    
     # Continua a girar até ver Vermelho de novo
     while color_sensor.color_name != LINE_COLOR_NAME:
         sleep(0.01)
-        
     tank_pair.off()
-    print("Posicao inicial recuperada.")
+    print("Posicao inicial recuperada.") 
 
+
+
+
+# FUNÇÕES DE MOVIMENTO E LÓGICA
 
 # Função para o robot seguir em linha reta com correção do giroscópio
 def _follow_straight_on_line(tank_pair, gyro, base_speed, kp, target_angle):
@@ -194,13 +203,27 @@ def _leave_current_line(tank_pair, color_sensor, spin_speed):
 
 
 # Função com a lógica principal do robot (loop)
-# ATENÇÃO: Adicionado medium_motor aos argumentos
 def run_challenge(tank_pair, medium_motor, color_sensor, us_sensor, gyro, spin_speed, forward_speed):
 
     KP_GAIN = 1.5 
+    turn_count = 0  # Contador de turnos
     
     try:
         while True:
+            
+            # --- ESPERA POR ENTER PARA INICIAR O TURNO ---
+            tank_pair.off() # Garante que está parado
+            print("\n" + "="*40)
+            print(" PRONTO PARA O TURNO {}".format(turn_count))
+            print(" Pressione [ENTER] no teclado para iniciar...")
+            print("="*40)
+            
+            # Esta função pausa o programa até receberes um Enter no terminal
+            input() 
+            
+            print(">>> A INICIAR TURNO {} <<<".format(turn_count))
+            # ---------------------------------------------------
+            
             
             # Estado 1 - Gira à procura da linha vermelha
             print("--- ESTADO 1: A procurar linha vermelha... ---")
@@ -215,18 +238,20 @@ def run_challenge(tank_pair, medium_motor, color_sensor, us_sensor, gyro, spin_s
             sleep(0.1) 
             distance_cm = us_sensor.distance_centimeters
             
-            print(distance_cm)
+            print("Distancia lida: {} cm".format(distance_cm))
+            
             if distance_cm < OBJECT_SEARCH_DISTANCE_CM:
 
                 # Estado 3 - Deteta inimigo em frente e aproxima-se
-                print("--- ESTADO 3: Inimigo detetado a {:.1f} cm! A aproximar-se...".format(distance_cm))
+                print("--- ESTADO 3: Inimigo detetado! A aproximar-se...")
                 follow_line_until_obstacle(
                     tank_pair=tank_pair, gyro=gyro, color_sensor=color_sensor,
                     us_sensor=us_sensor, base_speed=forward_speed, kp=KP_GAIN
                 )
+                
                 # --- EXECUTAR O ATAQUE ---
-                # Agora passamos o color_sensor em vez do gyro
-                perform_attack_maneuver(tank_pair, medium_motor, color_sensor)
+                perform_touch_attack(tank_pair)
+                #perform_attack_maneuver(tank_pair, medium_motor, color_sensor)
                 # -------------------------
 
                 # Estado 4 - Regressa do inimigo seguindo a linha
@@ -248,10 +273,11 @@ def run_challenge(tank_pair, medium_motor, color_sensor, us_sensor, gyro, spin_s
 
             else:
                 # Nenhum inimigo detetado em frente
-                print("Nenhum inimigo detetado em {:.1f} cm.".format(distance_cm))
+                print("Nenhum inimigo detetado neste slot.")
                 _leave_current_line(tank_pair, color_sensor, spin_speed)
             
-            sleep(1.0) # Pausa entre ciclos
+            # Incrementa o turno no final do ciclo
+            turn_count += 1
 
     except KeyboardInterrupt:
         print("\nPrograma interrompido pelo utilizador.")
@@ -290,7 +316,6 @@ def initialize_hardware():
         sleep(2.0) 
         gyro_sensor.reset()
         
-        # Retorna o motor médio também
         return tank_pair, medium_motor, color_sensor, us_sensor, gyro_sensor
     except Exception as e:
         print("Ocorreu um erro na inicializacao dos sensores e motores: {}".format(e))
@@ -298,13 +323,12 @@ def initialize_hardware():
 
 
 def main():
-    # Desempacota as variáveis corretamente, incluindo medium_motor
     tank_pair, medium_motor, color_sensor, us_sensor, gyro_sensor = initialize_hardware()
     
     if tank_pair is not None:
         run_challenge(
             tank_pair=tank_pair,
-            medium_motor=medium_motor, # Passa o motor médio para a função principal
+            medium_motor=medium_motor, 
             color_sensor=color_sensor, 
             us_sensor=us_sensor, 
             gyro=gyro_sensor,
