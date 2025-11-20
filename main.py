@@ -8,7 +8,7 @@ from ev3dev2.sound import Sound
 
 # --- Constantes de Comportamento ---
 OBSTACLE_STOP_DISTANCE_CM = 8
-     # Distância para parar à frente do inimigo
+# Distância para parar à frente do inimigo
 OBJECT_SEARCH_DISTANCE_CM = 45     # Distância para considerar "inimigo encontrado"
 LINE_COLOR_NAME = 'Red'            # Cor da linha a seguir até ao inimigo
 
@@ -34,10 +34,10 @@ def perform_touch_attack(tank_pair):
     print(">>> INICIAR ATAQUE DE TOQUE <<<")
     
     # 1. Investida: Avança 100% de velocidade
-    tank_pair.on_for_rotations(SpeedPercent(-70), SpeedPercent(-70), 0.2)
+    tank_pair.on_for_rotations(SpeedPercent(-55), SpeedPercent(-55), 0.2)
     sleep(0.2)
     # 2. Recuo: Volta para trás a mesma distância
-    tank_pair.on_for_rotations(SpeedPercent(70), SpeedPercent(70), 0.2)
+    tank_pair.on_for_rotations(SpeedPercent(55), SpeedPercent(55), 0.2)
     print(">>> Ataque de toque concluido. <<<")
 
 
@@ -46,6 +46,10 @@ def perform_touch_attack(tank_pair):
     # Ativa o motor (grua)
     # Volta a girar até encontra a linha vermelha, regressando à posição original (aprox. 180 graus)
 def perform_attack_maneuver(tank_pair, weapon_motor, color_sensor):
+
+    tank_pair.on_for_rotations(SpeedPercent(30), SpeedPercent(30), 0.5)
+
+
     print("A rodar 180 graus (a procura da linha vermelha)...")
     # Começa a girar para a direita
     tank_pair.on(SpeedPercent(20), SpeedPercent(-20))
@@ -59,10 +63,12 @@ def perform_attack_maneuver(tank_pair, weapon_motor, color_sensor):
     print("Posicao de ataque alcancada (Linha encontrada).")
     # --- FASE 2: EXECUTAR ATAQUE ---
     print("A ativar arma...")
+    tank_pair.on_for_rotations(SpeedPercent(20), SpeedPercent(20), 0.5)
     # Roda a 100% de velocidade por 2 segundos
-    weapon_motor.on_for_seconds(SpeedPercent(100), seconds=2)
+    weapon_motor.on_for_seconds(SpeedPercent(70), seconds=2)
     # --- FASE 3: VOLTAR À POSIÇÃO INICIAL ---
     print("Ataque concluido. A voltar a posicao inicial...")
+    tank_pair.on_for_rotations(SpeedPercent(-20), SpeedPercent(-20), 0.5)
     # Gira no sentido oposto (para a esquerda) para desfazer a rotação
     tank_pair.on(SpeedPercent(-20), SpeedPercent(20))
     # Espera 'cega' para sair da linha atual
@@ -72,6 +78,8 @@ def perform_attack_maneuver(tank_pair, weapon_motor, color_sensor):
         sleep(0.01)
     tank_pair.off()
     print("Posicao inicial recuperada.") 
+    tank_pair.on_for_rotations(SpeedPercent(-20), SpeedPercent(-20), 0.5)
+
 
 
 
@@ -141,7 +149,6 @@ def _search_for_lost_line(tank_pair, color_sensor, us_sensor, gyro, distance_che
 
 
 
-# nota: FALTA VBOLTAR PARA TRaas 
 def follow_line_until_obstacle(tank_pair, gyro, color_sensor, us_sensor, base_speed, kp):
     """
     Phase 1: Follow line until dist_phase_1.
@@ -208,6 +215,12 @@ def follow_line_return_to_distance(tank_pair, gyro, color_sensor, us_sensor, ret
     print("Estou a regressar do inimigo... Vou parar quando estiver a >= {}cm.".format(target_distance_cm))
     gyro.reset()
     target_angle = 0
+
+    print("Recuo de seguranca para reencontrar linha...")
+    # Nota: Usamos velocidade positiva (30) porque no teu codigo o negativo (-70) e para a frente
+    tank_pair.on_for_rotations(SpeedPercent(30), SpeedPercent(30), 0.5)
+
+
     stop_condition_check = lambda dist: dist >= target_distance_cm
     while not stop_condition_check(us_sensor.distance_centimeters):
         if color_sensor.color_name == LINE_COLOR_NAME:
@@ -287,13 +300,14 @@ def run_challenge(tank_pair, medium_motor, color_sensor, us_sensor, gyro, spin_s
                 )
                 
                 # --- EXECUTAR O ATAQUE ---
-                perform_touch_attack(tank_pair)
-                #perform_attack_maneuver(tank_pair, medium_motor, color_sensor)
+                #perform_touch_attack(tank_pair)
+                perform_attack_maneuver(tank_pair, medium_motor, color_sensor)
                 # -------------------------
 
                 # Estado 4 - Regressa do inimigo seguindo a linha
                 
                 play_wav("nein.wav")
+                
                 print("--- ESTADO 4: Fim de ataque! A regressar para o centro...")
                 sleep(0.5)
                 return_speed = forward_speed * -1 
