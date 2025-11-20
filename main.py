@@ -139,31 +139,68 @@ def _search_for_lost_line(tank_pair, color_sensor, us_sensor, gyro, distance_che
     return 'NOT_FOUND'
 
 
-# Função para seguir a linha até estar perto do inimigo
+
+
+# nota: FALTA VBOLTAR PARA TRaas 
 def follow_line_until_obstacle(tank_pair, gyro, color_sensor, us_sensor, base_speed, kp):
-    print("Estou a ir em direcao ao inimigo... Vou parar quando estiver a <= {}cm.".format(OBSTACLE_STOP_DISTANCE_CM))
+    """
+    Phase 1: Follow line until dist_phase_1.
+    Phase 2: Drive straight (blind) until dist_phase_2.
+    """
+    dist_phase_1 = 15
+    dist_phase_2 = 8
+    
+    # --- PHASE 1: Follow Line ---
+    print("FASE 1: A seguir linha ate {}cm do inimigo...".format(dist_phase_1))
     gyro.reset()
     target_angle = 0
-    stop_condition_check = lambda dist: dist <= OBSTACLE_STOP_DISTANCE_CM
-    while not stop_condition_check(us_sensor.distance_centimeters):
+    
+    # We continue as long as we are FARTHER than the phase 1 distance
+    while us_sensor.distance_centimeters > dist_phase_1:
+        
         if color_sensor.color_name == LINE_COLOR_NAME:
+            # Standard straight movement with Gyro correction
             _follow_straight_on_line(tank_pair, gyro, base_speed, kp, target_angle)
         else:
+            # Lost line logic
+            # We pass a lambda to ensure we don't crash while searching
             search_status = _search_for_lost_line(
                 tank_pair, color_sensor, us_sensor, gyro,
-                distance_check_func=stop_condition_check
+                distance_check_func=lambda d: d <= dist_phase_1
             )
+            
             if search_status == 'FOUND_LINE':
-                target_angle = 0
+                target_angle = 0 # Reset angle reference if we recovered the line
                 continue
             else:
+                # If line is completely lost or we hit the distance during search
                 break 
         sleep(0.01)
+
+    # --- PHASE 2: Blind Charge (No Line Check) ---
+    print("FASE 2: Linha ignorada. A avancar a direito ate {}cm...".format(dist_phase_2))
+    
+    # Reset gyro to 0 to ensure we drive perfectly straight from this point
+    gyro.reset() 
+    
+
+    # We continue as long as we are FARTHER than the phase 2 distance
+    while us_sensor.distance_centimeters > dist_phase_2:
+        
+        # Simple P-Control to keep robot straight using Gyro
+        # (This ensures "moving forward" actually goes straight and doesn't drift)
+        current_angle = gyro.angle
+        error = 0 - current_angle # Target is 0
+        correction = error * kp
+        
+        # Apply speed with correction (no color check here!)
+        tank_pair.on(base_speed - correction, base_speed + correction)
+        
+        sleep(0.01)
+
+    # --- STOP ---
     tank_pair.off()
-    if stop_condition_check(us_sensor.distance_centimeters):
-        print("Avanco concluido: Inimigo detetado a < {}cm. A parar...".format(OBSTACLE_STOP_DISTANCE_CM))
-    else:
-        print("Perdi a linha vermelha enquanto ia em direcao ao inimigo! A parar...")
+    print("ALVO ALCANCADO: Inimigo a < {}cm.".format(dist_phase_2))
 
 
 # Função para regressar ao centro após se aproximar do inimigo
