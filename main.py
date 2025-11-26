@@ -86,13 +86,22 @@ def perform_attack_maneuver(tank_pair, weapon_motor, color_sensor):
 
 # FUNÇÕES DE MOVIMENTO E LÓGICA
 
+# Helper para garantir que a velocidade do motor está entre -100 e 100
+def _clamp_speed(speed):
+    if speed > 100:
+        return 100
+    if speed < -100:
+        return -100
+    return speed
+
 # Função para o robot seguir em linha reta com correção do giroscópio
 def _follow_straight_on_line(tank_pair, gyro, base_speed, kp, target_angle):
     current_angle = gyro.angle
     correction = current_angle - target_angle
     turn_power = kp * correction
-    left_speed = base_speed + turn_power
-    right_speed = base_speed - turn_power
+    # Aplicar clamp para evitar erros de velocidade inválida
+    left_speed = _clamp_speed(base_speed + turn_power)
+    right_speed = _clamp_speed(base_speed - turn_power)
     tank_pair.on(SpeedPercent(left_speed), SpeedPercent(right_speed))
 
 
@@ -201,7 +210,10 @@ def follow_line_until_obstacle(tank_pair, gyro, color_sensor, us_sensor, base_sp
         correction = error * kp
         
         # Apply speed with correction (no color check here!)
-        tank_pair.on(base_speed - correction, base_speed + correction)
+        # Aplicar clamp para evitar erros de velocidade inválida
+        left_speed = _clamp_speed(base_speed - correction)
+        right_speed = _clamp_speed(base_speed + correction)
+        tank_pair.on(left_speed, right_speed)
         
         sleep(0.01)
 
@@ -243,101 +255,152 @@ def follow_line_return_to_distance(tank_pair, gyro, color_sensor, us_sensor, ret
         print("Perdi a linha vermelha enquanto regressava do inimigo! A parar...")
 
 
+#perform_touch_attack(tank_pair)
+#perform_attack_maneuver(tank_pair, medium_motor, color_sensor)
 # Função para sair da linha atual e preparar para procurar a próxima
+
 def _leave_current_line(tank_pair, color_sensor, spin_speed):
     print("A sair da linha vermelha atual...")
     tank_pair.on(left_speed=SpeedPercent(spin_speed * -1), right_speed=SpeedPercent(spin_speed))
-    while color_sensor.color_name == LINE_COLOR_NAME: 
-        sleep(0.01)
+    
     print("Fora da linha.")
 
-
 # Função com a lógica principal do robot (loop)
-def run_challenge(tank_pair, medium_motor, color_sensor, us_sensor, gyro, spin_speed, forward_speed):
+def search_enemies(tank_pair, medium_motor, color_sensor, us_sensor, gyro, spin_speed, forward_speed):
+    """
+    Executes a 360-degree scan of the environment.
+    - Stores up to 6 enemies in an array (initialized to None).
+    - Starts checking at the current position (Line 1/Start).
+    - Rotates through the circle and returns to the start.
+    - Waits for 'Enter' to restart the process.
+    """
 
-    KP_GAIN = 1.5 
-    turn_count = 0  # Contador de turnos
+    KP_GAIN = 1.5
+    LINE_COLOR_NAME = 'Red' # Assuming Red is the target line color
+    OBJECT_SEARCH_DISTANCE_CM = 40 # Threshold to detect enemy
     
+    # Define acceptable gyro error margin (e.g., 360 +/- 20 degrees)
+    FULL_TURN_MIN_ANGLE = 340 
+
     try:
-        while True:
+                
+        # 1. Initialize Array with 6 Null values
+        enemies_log = ["Empty"] * 6
+        
+        # 2. Reset Gyro and Accumulator
+        gyro.reset()
+        accumulated_angle = 0 # Tracks total rotation across segments
+        current_line_index = 0
+        
+        # Ensure we are stopped before starting
+        tank_pair.off()
+        
+        # --- PHASE 1: The 360 Loop ---
+        scanning = True
+        is_start_position = True # Flag to handle the first line immediately
+
+        while scanning:
             
-            # --- ESPERA POR ENTER PARA INICIAR O TURNO ---
-            tank_pair.off() # Garante que está parado
-            print("\n" + "="*40)
-            print(" PRONTO PARA O TURNO {}".format(turn_count))
-            print(" Pressione [ENTER] no teclado para iniciar...")
-            print("="*40)
+            # A. Movement Logic (Skip on the first pass to check start line)
+            if not is_start_position:
+                # Reset Gyro before moving to measure ONLY this segment.
+                # This fixes the issue where attack functions reset the gyro.
+                gyro.reset()
+                
+                # 1. Leave the current line (Blind Spin)
+                tank_pair.on(left_speed=SpeedPercent(spin_speed * -1), right_speed=SpeedPercent(spin_speed))
+                sleep(0.5) 
+
+                # 2. Rotate until next Red line is found
+                print("Searching for next line...")
+                while color_sensor.color_name != LINE_COLOR_NAME:
+                    sleep(0.01)
+                
+                # Stop immediately upon finding the line
+                tank_pair.off()
+                
+                # 3. Add segment angle to total
+                segment_angle = abs(gyro.angle)
+                accumulated_angle += segment_angle
+                
+                print("Segment: {} | Total Angle: {}".format(segment_angle, accumulated_angle))
+
+                # --- NEW: Check for skipped lines based on angle ---
+                # Expected angle is 60 (360/6). A threshold of 90 is safe.
+                SKIPPED_LINE_ANGLE_THRESHOLD = 90
+                EXPECTED_SEGMENT_ANGLE = 60
+                
+                if segment_angle > SKIPPED_LINE_ANGLE_THRESHOLD and current_line_index < 5:
+                    # Calculate how many lines were likely skipped
+                    num_skipped = round(segment_angle / EXPECTED_SEGMENT_ANGLE) - 1
+                    if num_skipped > 0:
+                        print("!!! Angle of {} is too large. Assuming {} line(s) were skipped.".format(segment_angle, num_skipped))
+                        # Advance the index, leaving the skipped slots as 'None' in the log
+                        current_line_index += num_skipped
+                # ----------------------------------------------------
+
+                if accumulated_angle >= FULL_TURN_MIN_ANGLE or current_line_index == 6:
+                    print("--- 360 Turn Complete (Back at Start) ---")
+                    scanning = False
+                    break 
             
-            # Esta função pausa o programa até receberes um Enter no terminal
-            input() 
+            # B. Radar & Attack Logic
+            # (Executes for Start Line first, then subsequent lines)
             
-            print(">>> A INICIAR TURNO {} <<<".format(turn_count))
-            # ---------------------------------------------------
-            
-            
-            # Estado 1 - Gira à procura da linha vermelha
-            print("--- ESTADO 1: A procurar linha vermelha... ---")
-            tank_pair.on(left_speed=SpeedPercent(spin_speed * -1), right_speed=SpeedPercent(spin_speed))
-            while color_sensor.color_name != LINE_COLOR_NAME:
-                sleep(0.01) 
-            
-            
-            # Estado 2 - Encontra a linha, pára e verifica se há inimigo no slot em frente
-            tank_pair.off()
-            print("--- ESTADO 2: Linha vermelha detetada! A parar e a verificar existencia de inimigo... ---")
-            sleep(0.1) 
+            print("--- Processing Line/Slot {} ---".format(current_line_index + 1))
+            sleep(0.1) # Stabilize
             distance_cm = us_sensor.distance_centimeters
             
-            print("Distancia lida: {} cm".format(distance_cm))
-            
             if distance_cm < OBJECT_SEARCH_DISTANCE_CM:
-
-                # Estado 3 - Deteta inimigo em frente e aproxima-se
-                print("--- ESTADO 3: Inimigo detetado! A aproximar-se...")
+                print("Enemy detected at {}cm (Slot {})".format(distance_cm, current_line_index + 1))
+                
+                # --- ACTION: Approach Enemy ---
+                # (Note: This function may reset gyro, but we handle that by resetting again before moving)
                 follow_line_until_obstacle(
                     tank_pair=tank_pair, gyro=gyro, color_sensor=color_sensor,
                     us_sensor=us_sensor, base_speed=forward_speed, kp=KP_GAIN
                 )
                 
-                # --- EXECUTAR O ATAQUE ---
-                #perform_touch_attack(tank_pair)
-                perform_attack_maneuver(tank_pair, medium_motor, color_sensor)
-                # -------------------------
-
-                # Estado 4 - Regressa do inimigo seguindo a linha
+                # --- ACTION: Log Color ---
+                detected_color = color_sensor.color_name
+                print("Logging Enemy Color: {}".format(detected_color))
                 
-                play_wav("nein.wav")
+                if current_line_index < 6:
+                    enemies_log[current_line_index] = detected_color
                 
-                print("--- ESTADO 4: Fim de ataque! A regressar para o centro...")
-                sleep(0.5)
-                return_speed = forward_speed * -1 
-                start_distance_cm = distance_cm 
-
+                # --- ACTION: Return ---
+                return_speed = forward_speed * -1
                 follow_line_return_to_distance(
                     tank_pair=tank_pair, gyro=gyro, color_sensor=color_sensor,
                     us_sensor=us_sensor, return_speed=return_speed, kp=KP_GAIN,
-                    target_distance_cm=start_distance_cm - 0.8
+                    target_distance_cm=distance_cm - 0.8 
                 )
-                
-                # Ignora a linha atual para voltar ao ESTADO 1
-                _leave_current_line(tank_pair, color_sensor, spin_speed)
-
             else:
-                # Nenhum inimigo detetado em frente
-                print("Nenhum inimigo detetado neste slot.")
-                _leave_current_line(tank_pair, color_sensor, spin_speed)
+                print("Slot {} is empty.".format(current_line_index + 1))
+                if current_line_index < 6:
+                    enemies_log[current_line_index] = "Empty"
+
+            # Update state for next iteration
+            is_start_position = False
+            current_line_index += 1
             
-            # Incrementa o turno no final do ciclo
-            turn_count += 1
+            # Safety break if we exceed array size (though gyro should stop it first)
+            if current_line_index >= 6:
+                print("Max slots reached, returning to start...")
+                # Even if we hit 6 slots, we still need to physically return to start
+                # The loop will continue to 'Movement Logic', find start line, check angle, and break.
+
+        # --- PHASE 2: Report Results ---
+        print("\n--- SCAN FINISHED ---")
+        return enemies_log
 
     except KeyboardInterrupt:
-        print("\nPrograma interrompido pelo utilizador.")
+        print("\nProgram interrupted by user.")
     except Exception as e:
-        print("Ocorreu um erro durante o ciclo: {}".format(e))
+        print("Error: {}".format(e))
     finally:
         tank_pair.off()
         medium_motor.off()
-        print("Motores parados.")
 
 
 # Função para inicializar do hardware
@@ -377,7 +440,11 @@ def main():
     tank_pair, medium_motor, color_sensor, us_sensor, gyro_sensor = initialize_hardware()
     
     if tank_pair is not None:
-        run_challenge(
+
+        # --- PHASE 0: Wait for Start ---
+        # Using input() to simulate waiting for "Enter" key in the console
+        input("\n>>> Pressione Enter para procurar inimigos...")
+        enemies_log =search_enemies(
             tank_pair=tank_pair,
             medium_motor=medium_motor, 
             color_sensor=color_sensor, 
@@ -386,6 +453,8 @@ def main():
             spin_speed=20,
             forward_speed=-20
         )
+
+        print(enemies_log)
     else:
         print("Falha ao inicializar hardware. A sair...")
 
