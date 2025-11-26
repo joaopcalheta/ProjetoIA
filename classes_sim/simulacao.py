@@ -51,13 +51,13 @@ def run_game():
         
         if turno % 2 == 0:
             # --- TURNO DO BOT (Par) ---
-            print(f"\n=== TURNO {turno} (DEFENDER-BOT) ===")
+            print("\n=== TURNO {} (DEFENDER-BOT) ===".format(turno))
             bot.iniciar_novo_turno()
             #decisão do robot (deixado em branco como pediste)
             
         else:
             # --- TURNO DO ATACANTE (Ímpar) ---
-            print(f"\n=== TURNO {turno} (ATACANTE) ===")
+            print("\n=== TURNO {} (ATACANTE) ===".format(turno))
             
             dano_total_neste_turno = 0
             
@@ -70,7 +70,7 @@ def run_game():
                     inimigo = s.get_inimigo_pronto_para_atacar()
                     if inimigo:
                         dano_do_inimigo = inimigo.calcular_dano_total_do_turno()
-                        print(f"!!! {inimigo.tipo} (Slot {s.id}) ataca o Bot com {dano_do_inimigo} de dano!")
+                        print("!!! {} (Slot {}) ataca o Bot com {} de dano!".format(inimigo.tipo, s.id, dano_do_inimigo))
                         dano_total_neste_turno += dano_do_inimigo
             
             # LOOP 2: QUEM CHEGA NESTE TURNO, POSICIONA-SE
@@ -84,11 +84,11 @@ def run_game():
             # Aplica o dano ao Bot
             if dano_total_neste_turno > 0:
                 bot.vida -= dano_total_neste_turno
-                print(f"Bot sofreu {dano_total_neste_turno} de dano. Vida restante: {bot.vida}")
+                print("Bot sofreu {} de dano. Vida restante: {}".format(dano_total_neste_turno, bot.vida))
 
         # Verifica se o jogo acabou (depois de qualquer turno)
         if bot.vida <= 0:
-            print(f"\n--- FIM DE JOGO (no Turno {turno}): O Defender-Bot foi destruído! ---")
+            print("\n--- FIM DE JOGO (no Turno {}): O Defender-Bot foi destruído! ---".format(turno))
             break
             
     if bot.vida > 0:

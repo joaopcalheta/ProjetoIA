@@ -1,15 +1,18 @@
 INIMIGO_STATS = {
     "Tanque": {
+        "cor": "Green",
         "forca": 200,
         "num_ataques": 2,
         "vida_max": 200,
     },
     "Artilharia": {
+        "cor": "Yellow",
         "forca": 500,
         "num_ataques": 1,
         "vida_max": 50,
     },
-    "Infanteria": {
+    "Infantaria": {
+        "cor": "Blue",
         "forca": 100,
         "num_ataques": 3,
         "vida_max": 100,
@@ -23,7 +26,7 @@ INIMIGO_STATS = {
 class Inimigo:
     def __init__(self, tipo, turno_inicial):
         if tipo not in INIMIGO_STATS:
-            raise ValueError(f"Tipo de inimigo desconhecido: {tipo}")
+            raise ValueError("Tipo de inimigo desconhecido: {}".format(tipo))
 
         #Guarda o tipo
         self.tipo = tipo
@@ -49,16 +52,16 @@ class Inimigo:
 
     def receber_dano(self, quantidade_dano):
         if not self.esta_vivo():
-            print(f"{self.tipo} já estava destruído.")
+            print("{} já estava destruído.".format(self.tipo))
             return
 
         self.vida -= quantidade_dano
         
         if self.vida <= 0:
             self.vida = 0
-            print(f"!!! {self.tipo} foi destruído!")
+            print("!!! {} foi destruído!".format(self.tipo))
         else:
-            print(f"{self.tipo} recebeu {quantidade_dano} de dano. Vida restante: {self.vida}/{self.vida_max}")
+            print("{} recebeu {} de dano. Vida restante: {}/{}".format(self.tipo, quantidade_dano, self.vida, self.vida_max))
 
     def calcular_dano_total_do_turno(self):
         if not self.pode_atacar():
@@ -79,4 +82,4 @@ class Inimigo:
         estado = "Posicionado" if self.posicionado else "Aguardando"
         if not self.esta_vivo():
             estado = "Destruído"  
-        return f"<{self.tipo} | Vida: {self.vida}/{self.vida_max} | Turno: {self.turno_inicial} | Estado: {estado}>"
+        return "<{} | Vida: {}/{} | Turno: {} | Estado: {}>".format(self.tipo, self.vida, self.vida_max, self.turno_inicial, estado)

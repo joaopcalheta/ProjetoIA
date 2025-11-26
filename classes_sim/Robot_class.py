@@ -104,7 +104,7 @@ class DenfenderBot:
 
         #Verifica se tem energia suficiente 
         if self.energia < custo:
-            print(f"Bot tentou usar '{tipo_cura}' (custo {custo}) mas só tem {self.energia:.0f} de energia.")
+            print("Bot tentou usar '{}' (custo {}) mas só tem {:.0f} de energia.".format(tipo_cura, custo, self.energia))
             return False
             
         #Realiza a cura
