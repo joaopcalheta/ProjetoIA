@@ -8,16 +8,14 @@ from ev3dev2.sensor import INPUT_1, INPUT_2, INPUT_4
 from ev3dev2.sound import Sound
 
 # Importa o dicionário de inimigos do ficheiro de classes
-from classes_sim.Inimigo_class import INIMIGO_STATS, Inimigo
-from classes_sim.Slot_class import Slot
-from classes_sim.Robot_class import DenfenderBot
+from classes_sim.Inimigo_class import INIMIGO_STATS
 
 
 
 # --- Constantes de Comportamento ---
 OBSTACLE_STOP_DISTANCE_CM = 8
 # Distância para parar à frente do inimigo
-OBJECT_SEARCH_DISTANCE_CM = 45     # Distância para considerar "inimigo encontrado"
+OBJECT_SEARCH_DISTANCE_CM = 40     # Distância para considerar "inimigo encontrado"
 LINE_COLOR_NAME = 'Red'            # Cor da linha a seguir até ao inimigo
 
 # --- Constantes de Afinação ---
@@ -26,61 +24,35 @@ SEARCH_TIME_LEFT_S = 0.5           # Duração da procura para a esquerda
 SEARCH_TIME_RIGHT_S = 3.0          # Duração da procura para a direita
 
 
-def setup_jogo():
-    """
-    Cria os 6 slots e sorteia os inimigos, criando os seus objectos.
-    Esta função define o estado inicial do jogo que persistirá.
-    """
-    print("--- A INICIAR O SETUP DO JOGO ---")
-    lista_slots = [Slot(id=i+1) for i in range(6)]
-    
-    print("=" * 60)
-    print("{:<10} | {:<18} | {:<20}".format("Posicao", "Tipo de atacante", "Turno para Posicionar"))
-    print("=" * 60)
-
-    for slot in lista_slots:
-        dado_tipo = random.randint(1, 6)
-        dado_turno = random.randint(1, 6) * 2 - 1 # Garante que o turno é ímpar (1, 3, 5, 7, 9, 11)
-
-        if dado_tipo <= 2:
-            tipo = "Tanque"
-        elif dado_tipo <= 4:
-            tipo = "Artilharia"
-        else:
-            tipo = "Infanteria"
-        
-        slot.adicionar_inimigo(tipo, dado_turno)
-        print("Slot{:<4} | {:<18} | {:<20}".format(slot.id, tipo, dado_turno))
-    print("=" * 60)
-    print("--- SETUP COMPLETO ---")
-    return lista_slots
 
 def rolar_dado_digital():
     return random.randint(1, 6)
 
-print("=" * 60)
-# Usamos .format() aqui para alinhar o texto
-print("{:<10} | {:<18} | {:<20}".format("Posicao", "Tipo de atacante", "Turno inicial (1-6)"))
-print("=" * 60)
-
-for i in range(1, 7):
-    dado_tipo = rolar_dado_digital()
-    dado_turno = rolar_dado_digital()
-
-    if dado_tipo <= 2:
-        unidade = "Tanque"
-    elif dado_tipo <= 4:
-        unidade = "Artilharia"
-    else:
-        unidade = "Infantaria"
-
-    # Substituimos o f"{variavel}" por "{}".format(variavel)
-    print("Slot{:<4} | {:<18} | {:<20}".format(i, unidade, dado_turno))
-
-print("=" * 60)
-
-
-
+def imprimir_setup_inicial():
+    """
+    Rola os dados para 6 slots e imprime uma tabela com os resultados.
+    Esta função é para demonstração e não afeta o estado do jogo.
+    """
+    print("=" * 60)
+    # Usamos .format() aqui para alinhar o texto
+    print("{:<10} | {:<18} | {:<20}".format("Posicao", "Tipo de atacante", "Turno inicial (1-6)"))
+    print("=" * 60)
+    
+    for i in range(1, 7):
+        dado_tipo = rolar_dado_digital()
+        dado_turno = rolar_dado_digital()
+    
+        if dado_tipo <= 2:
+            unidade = "Tanque"
+        elif dado_tipo <= 4:
+            unidade = "Artilharia"
+        else:
+            unidade = "Infantaria"
+    
+        # Substituimos o f"{variavel}" por "{}".format(variavel)
+        print("Slot{:<4} | {:<18} | {:<20}".format(i, unidade, dado_turno))
+    
+    print("=" * 60)
 
 
 
@@ -472,32 +444,6 @@ def search_enemies(tank_pair, medium_motor, color_sensor, us_sensor, gyro, spin_
         # Ensure motors are stopped if the function exits unexpectedly.
         tank_pair.off()
 
-def bot_decision_and_attack(bot, lista_slots, enemies_log, tank_pair, medium_motor, color_sensor):
-    """
-    Lógica de decisão do Bot.
-    Por agora, ataca o primeiro inimigo válido que encontrar.
-    """
-    print("\n--- FASE DE DECISÃO DO BOT ---")
-    
-    # Mapeia cor para tipo de inimigo
-    color_to_type = {stats['cor']: tipo for tipo, stats in INIMIGO_STATS.items()}
-
-    for i, detected_color in enumerate(enemies_log):
-        slot_id = i + 1
-        slot_alvo = lista_slots[i]
-
-        # Verifica se o slot está ocupado na simulação e se o que o robot viu corresponde
-        if not slot_alvo.esta_vazio() and detected_color != "Empty":
-            inimigo_no_slot = slot_alvo.get_inimigo_para_reconhecer()
-            
-            if inimigo_no_slot and color_to_type.get(detected_color) == inimigo_no_slot.tipo:
-                print("DECISÃO: Atacar {} no Slot {}.".format(inimigo_no_slot.tipo, slot_id))
-                
-                # Exemplo: Usar o ataque "grua"
-                # A função `atacar_slot` já desconta energia e aplica o dano
-                if bot.atacar_slot("grua", slot_alvo):
-                    print("Ataque 'grua' realizado com sucesso no Slot {}.".format(slot_id))
-                    return # Ataca apenas um inimigo por turno
 
 
 # Função para inicializar do hardware
@@ -534,7 +480,6 @@ def initialize_hardware():
 
 
 def run_game_loop(tank_pair, medium_motor, color_sensor, us_sensor, gyro, spin_speed, forward_speed):
-def run_game_loop(bot, lista_slots, tank_pair, medium_motor, color_sensor, us_sensor, gyro, spin_speed, forward_speed):
     """
     Controla os turnos do jogo.
     """
@@ -557,36 +502,12 @@ def run_game_loop(bot, lista_slots, tank_pair, medium_motor, color_sensor, us_se
                 spin_speed=spin_speed,
                 forward_speed=forward_speed
             )
-        for turno in range(1, 14): # Ciclo de 1 a 13
 
             # 3. Imprime o resultado
             print("\nResultado do Turno {}: {}".format(turn_count, enemies_log))
             
             # 4. codigo restante do turno, ataques dos inimigos
-            if turno % 2 == 0:
-                # --- TURNO DO BOT (Par) ---
-                print("\n=== TURNO {} (DEFENDER-BOT) ===".format(turno))
-                bot.iniciar_novo_turno()
-                
-                # 1. Espera pelo Enter para começar a fase de ação do robot
-                input(">>> Pressione ENTER para iniciar a varredura e ataque...")
-                
-                # 2. Executa a pesquisa física (retorna o log de cores)
-                enemies_log = search_enemies(
-                    tank_pair=tank_pair,
-                    medium_motor=medium_motor, 
-                    color_sensor=color_sensor, 
-                    us_sensor=us_sensor, 
-                    gyro=gyro,
-                    spin_speed=spin_speed,
-                    forward_speed=forward_speed
-                )
 
-                # 3. Imprime o resultado da varredura
-                print("\nResultado da Varredura (Turno {}): {}".format(turno, enemies_log))
-                
-                # 4. Lógica de decisão e ataque do bot
-                bot_decision_and_attack(bot, lista_slots, enemies_log, tank_pair, medium_motor, color_sensor)
 
             
             print("turno acabado")
@@ -594,41 +515,11 @@ def run_game_loop(bot, lista_slots, tank_pair, medium_motor, color_sensor, us_se
             # 5. Incrementa o turno
             turn_count += 1
             print("-" * 30)
-            else:
-                # --- TURNO DO ATACANTE (Ímpar) ---
-                print("\n=== TURNO {} (ATACANTE) ===".format(turno))
-                dano_total_neste_turno = 0
-                
-                # LOOP 1: Inimigos já posicionados atacam
-                for s in lista_slots:
-                    inimigo = s.get_inimigo_pronto_para_atacar()
-                    if inimigo:
-                        dano_do_inimigo = inimigo.calcular_dano_total_do_turno()
-                        print("!!! {} (Slot {}) ataca o Bot com {} de dano!".format(inimigo.tipo, s.id, dano_do_inimigo))
-                        dano_total_neste_turno += dano_do_inimigo
-                
-                # LOOP 2: Novos inimigos chegam e posicionam-se
-                for s in lista_slots:
-                    s.atualizar_estado_inimigo(turno)
-                
-                # Aplica o dano total ao Bot
-                if dano_total_neste_turno > 0:
-                    bot.vida -= dano_total_neste_turno
-                    print("Bot sofreu {} de dano. Vida restante: {:.0f}/{}".format(dano_total_neste_turno, bot.vida, bot.max_vida))
-
-            # Verifica condição de fim de jogo
-            if bot.vida <= 0:
-                print("\n--- FIM DE JOGO (Turno {}): O Defender-Bot foi destruído! ---".format(turno))
-                break
-        
-        if bot.vida > 0:
-            print("\n--- FIM DE JOGO: O Defender-Bot sobreviveu! ---")
 
     except KeyboardInterrupt:
         print("\nPrograma interrompido pelo utilizador.")
     except Exception as e:
         print("Erro: {}".format(e))
-        print("Erro inesperado no loop do jogo: {}".format(e))
     finally:
         tank_pair.off()
         medium_motor.off()
@@ -638,23 +529,12 @@ def main():
     tank_pair, medium_motor, color_sensor, us_sensor, gyro_sensor = initialize_hardware()
     
     if tank_pair is not None:
-        
-        # Cria o Bot e os Inimigos no início
-        bot = DenfenderBot()
-        lista_slots = setup_jogo()
-
-        rolar_dado_digital()
-
 
         # --- PHASE 0: Wait for Start ---
         # Using input() to simulate waiting for "Enter" key in the console
+        imprimir_setup_inicial()
         
-        
-        
-        # Inicia o loop principal do jogo
         run_game_loop(
-            bot=bot,
-            lista_slots=lista_slots,
             tank_pair=tank_pair,
             medium_motor=medium_motor, 
             color_sensor=color_sensor, 
@@ -662,7 +542,6 @@ def main():
             gyro=gyro_sensor,
             spin_speed=20,
             forward_speed=-20
-            forward_speed=-20 # Velocidade negativa para andar para a frente
         )
 
 
