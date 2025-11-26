@@ -22,6 +22,7 @@ SPIN_SEARCH_SPEED = 15             # Velocidade de rotação durante a procura d
 SEARCH_TIME_LEFT_S = 0.5           # Duração da procura para a esquerda
 SEARCH_TIME_RIGHT_S = 3.0          # Duração da procura para a direita
 
+enemies = [None] * 6
 
 INIMIGO_STATS = {
     "Tanque": {
@@ -621,20 +622,27 @@ def run_game_loop(tank_pair, medium_motor, color_sensor, us_sensor, gyro, spin_s
             # 3. Imprime o resultado
             print("\nResultado do Turno {}: {}".format(turn_count, enemies_log))
             
-            # 4. codigo restante do turno, ataques dos inimigos
-
-            meus_inimigos = inicializar_inimigos_por_cor(enemies_log)
-
-            print("\n--- Estado Final do Array de Inimigos ---")
-            for i, inimigo in enumerate(meus_inimigos):
+            # 4. Atualiza o array global 'enemies' com novos inimigos encontrados.
+            #    Não substitui inimigos que já existem.
+            print("\n--- A atualizar o estado dos inimigos ---")
+            novos_inimigos = inicializar_inimigos_por_cor(enemies_log)
+            
+            for i, novo_inimigo in enumerate(novos_inimigos):
+                # Se o slot no array principal está vazio e um novo inimigo foi detectado
+                if enemies[i] is None and novo_inimigo is not None:
+                    print("Novo inimigo adicionado na Posicao {}".format(i))
+                    enemies[i] = novo_inimigo # Adiciona a nova instância
+            
+            # 5. Imprime o estado atual do campo de batalha
+            print("\n--- Campo de Batalha Atual (Turno {}) ---".format(turn_count))
+            for i, inimigo in enumerate(enemies):
                 if inimigo is None:
                     print("Posicao {}: Vazio".format(i))
                 else:
-                    # Aqui ele usa a função __str__ da classe Inimigo que criámos antes
-                    print("Posicao {}: {}".format(i, inimigo))            
+                    print("Posicao {}: {}".format(i, inimigo))
             print("turno acabado")
             
-            # 5. Incrementa o turno
+            # 6. Incrementa o turno
             turn_count += 1
             print("-" * 30)
 
