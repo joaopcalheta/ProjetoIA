@@ -7,8 +7,7 @@ from ev3dev2.sensor.lego import ColorSensor, UltrasonicSensor, GyroSensor
 from ev3dev2.sensor import INPUT_1, INPUT_2, INPUT_4
 from ev3dev2.sound import Sound
 
-# Importa o dicionário de inimigos do ficheiro de classes
-from classes_sim.Inimigo_class import INIMIGO_STATS
+
 
 
 
@@ -23,6 +22,122 @@ SPIN_SEARCH_SPEED = 15             # Velocidade de rotação durante a procura d
 SEARCH_TIME_LEFT_S = 0.5           # Duração da procura para a esquerda
 SEARCH_TIME_RIGHT_S = 3.0          # Duração da procura para a direita
 
+
+INIMIGO_STATS = {
+    "Tanque": {
+        "cor": "Green",
+        "forca": 200,
+        "num_ataques": 2,
+        "vida_max": 200,
+    },
+    "Artilharia": {
+        "cor": "Yellow",
+        "forca": 500,
+        "num_ataques": 1,
+        "vida_max": 50,
+    },
+    "Infantaria": {
+        "cor": "Blue",
+        "forca": 100,
+        "num_ataques": 3,
+        "vida_max": 100,
+    }
+}
+
+class Inimigo:
+    def __init__(self, tipo):
+        """
+        Cria um inimigo com base no tipo (ex: 'Tanque', 'Infantaria').
+        Se o tipo não existir, levanta um erro.
+        """
+        if tipo not in INIMIGO_STATS:
+            raise ValueError("Tipo de inimigo desconhecido: {}".format(tipo))
+        
+        # Carregar estatísticas do dicionário
+        stats = INIMIGO_STATS[tipo]
+        
+        self.tipo = tipo
+        self.cor = stats['cor']
+        self.forca = stats['forca']
+        self.num_ataques = stats['num_ataques']
+        self.vida_max = stats['vida_max']
+        
+        # A vida atual começa cheia
+        self.vida_atual = self.vida_max
+
+    def receber_dano(self, dano):
+        """
+        Reduz a vida do inimigo. Retorna True se morreu, False se continua vivo.
+        """
+        self.vida_atual -= dano
+        if self.vida_atual < 0:
+            self.vida_atual = 0
+        
+        print("{} (Cor: {}) sofreu {} de dano. Vida restante: {}/{}".format(
+            self.tipo, self.cor, dano, self.vida_atual, self.vida_max
+        ))
+        
+        return self.vida_atual == 0
+
+    def esta_vivo(self):
+        """Retorna True se a vida for maior que 0."""
+        return self.vida_atual > 0
+
+    def curar(self):
+        """Restaura a vida ao máximo."""
+        self.vida_atual = self.vida_max
+        print("{} foi reparado/curado completamente.".format(self.tipo))
+
+    def __str__(self):
+        """Representação completa do objeto em texto."""
+        status = "VIVO" if self.esta_vivo() else "DESTRUIDO"
+        
+        # Agora inclui Forca e Num_Ataques
+        return "[Tipo: {} | Cor: {} | Vida: {}/{} | Forca: {} | Atqs: {} | Status: {}]".format(
+            self.tipo, 
+            self.cor, 
+            self.vida_atual, 
+            self.vida_max, 
+            self.forca,       # Adicionado
+            self.num_ataques, # Adicionado
+            status
+        )
+
+
+def inicializar_inimigos_por_cor(lista_cores):
+    """
+    Recebe: ['Empty', 'Green', 'Empty', ...]
+    Retorna: [None, Objeto(Tanque), None, ...]
+    """
+    lista_objetos_inimigos = []
+
+    print("--- A processar deteccoes ---")
+
+    for i, cor in enumerate(lista_cores):
+        if cor == "Empty":
+            # Se o slot estiver vazio, guardamos None (ou "Empty")
+            lista_objetos_inimigos.append(None) 
+        else:
+            # Precisamos descobrir qual o INIMIGO que tem esta cor
+            tipo_encontrado = None
+            
+            # Procura no dicionário qual a chave (Tipo) que tem esta cor
+            for tipo, stats in INIMIGO_STATS.items():
+                if stats['cor'] == cor:
+                    tipo_encontrado = tipo
+                    break
+            
+            if tipo_encontrado:
+                # Cria o objeto Inimigo
+                novo_inimigo = Inimigo(tipo_encontrado)
+                lista_objetos_inimigos.append(novo_inimigo)
+                print("Slot {}: Criado {} (Cor: {})".format(i+1, tipo_encontrado, cor))
+            else:
+                # Caso detete uma cor que não está no dicionário (ex: Red)
+                print("Slot {}: Cor '{}' desconhecida. Ignorado.".format(i+1, cor))
+                lista_objetos_inimigos.append(None)
+
+    return lista_objetos_inimigos
 
 
 def rolar_dado_digital():
@@ -508,8 +623,15 @@ def run_game_loop(tank_pair, medium_motor, color_sensor, us_sensor, gyro, spin_s
             
             # 4. codigo restante do turno, ataques dos inimigos
 
+            meus_inimigos = inicializar_inimigos_por_cor(enemies_log)
 
-            
+            print("\n--- Estado Final do Array de Inimigos ---")
+            for i, inimigo in enumerate(meus_inimigos):
+                if inimigo is None:
+                    print("Posicao {}: Vazio".format(i))
+                else:
+                    # Aqui ele usa a função __str__ da classe Inimigo que criámos antes
+                    print("Posicao {}: {}".format(i, inimigo))            
             print("turno acabado")
             
             # 5. Incrementa o turno
@@ -523,6 +645,7 @@ def run_game_loop(tank_pair, medium_motor, color_sensor, us_sensor, gyro, spin_s
     finally:
         tank_pair.off()
         medium_motor.off()
+
 
 
 def main():
