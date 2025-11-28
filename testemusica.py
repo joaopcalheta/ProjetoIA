@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 import random
+import threading
+import os
 from time import sleep, time
 from ev3dev2.motor import (SpeedPercent, MoveTank, MediumMotor, OUTPUT_A, OUTPUT_B, OUTPUT_C)
 from ev3dev2.sensor.lego import ColorSensor, UltrasonicSensor, GyroSensor
@@ -47,7 +48,7 @@ INIMIGO_STATS = {
 }
 
 class Inimigo:
-    def __init__(self, tipo, turno_spawn):
+    def __init__(self, tipo):
         """
         Cria um inimigo com base no tipo (ex: 'Tanque', 'Infantaria').
         Se o tipo não existir, levanta um erro.
@@ -63,7 +64,6 @@ class Inimigo:
         self.forca = stats['forca']
         self.num_ataques = stats['num_ataques']
         self.vida_max = stats['vida_max']
-        self.turno_spawn = turno_spawn # Guarda o turno em que foi criado
         
         # A vida atual começa cheia
         self.vida_atual = self.vida_max
@@ -107,14 +107,11 @@ class Inimigo:
         )
 
 
-
-
-def inicializar_inimigos_por_cor(lista_cores, turno_atual):
+def inicializar_inimigos_por_cor(lista_cores):
     """
     Recebe: ['Empty', 'Green', 'Empty', ...]
     Retorna: [None, Objeto(Tanque), None, ...]
     """
-
     lista_objetos_inimigos = []
 
     print("--- A processar deteccoes ---")
@@ -135,7 +132,7 @@ def inicializar_inimigos_por_cor(lista_cores, turno_atual):
             
             if tipo_encontrado:
                 # Cria o objeto Inimigo
-                novo_inimigo = Inimigo(tipo_encontrado, turno_atual)
+                novo_inimigo = Inimigo(tipo_encontrado)
                 lista_objetos_inimigos.append(novo_inimigo)
                 print("Slot {}: Criado {} (Cor: {})".format(i+1, tipo_encontrado, cor))
             else:
@@ -144,25 +141,6 @@ def inicializar_inimigos_por_cor(lista_cores, turno_atual):
                 lista_objetos_inimigos.append(None)
 
     return lista_objetos_inimigos
-
-
-def check_game_over(bot, enemies_list):
-    """
-    Verifica se o jogo terminou.
-    Retorna 'vitoria' se todos os inimigos foram derrotados.
-    Retorna 'derrota' se o robô foi destruído.
-    Retorna None se o jogo continua.
-    """
-    if not bot.esta_vivo():
-        return "derrota"
-
-    # Verifica se existe algum inimigo vivo
-    for inimigo in enemies_list:
-        if inimigo and inimigo.esta_vivo():
-            return None # Encontrou um inimigo vivo, o jogo continua
-
-    # Se o loop terminar, significa que não há inimigos vivos
-    return "vitoria"
 
 
 def rolar_dado_digital():
@@ -193,278 +171,6 @@ def imprimir_setup_inicial():
         print("Slot{:<4} | {:<18} | {:<20}".format(i, unidade, dado_turno))
     
     print("=" * 60)
-
-
-
-ROBOT_INITIAL_HEALTH = 750
-ROBOT_MAX_ENERGY = 500
-ENERGY_RECOVERY_PERCENT = 0.5
-
-
-BOT_ATTACKS = {
-
-    "crane" : {"damage": 200, "cost": 300},
-    "touch" : {"damage": 100, "cost": 150},
-    "sound" : {"damage": 50, "cost": 50}
-}
-
-
-BOT_HEALS = {
-    "heal_1": {"health": 100, "cost": 200},
-    "heal_2": {"health": 200, "cost": 300},
-    "heal_3": {"health": 400, "cost": 400}
-}
-
-
-#------------------------------------------CLASS DEFENDER_BOT-----------------------------------------------------------------------------------
-
-class DefenderBot:
-    def __init__(self):
-
-        self.health = ROBOT_INITIAL_HEALTH
-        self.energy = ROBOT_MAX_ENERGY
-        self.max_health = ROBOT_INITIAL_HEALTH
-
-        self.heal_used_this_turn = False
-        self.slots_attacked_this_turn = set() # stores the number of the slot attacked in the turn
-
-    def start_new_turn(self):
-
-        
-        #Recovers energy
-        #self.energy += 10 # Base recovery to prevent getting stuck at 0
-        recovered_energy = self.energy * ENERGY_RECOVERY_PERCENT
-        self.energy += recovered_energy
-        
-        #Limit energy to the maximum
-        if self.energy > ROBOT_MAX_ENERGY:
-            self.energy = ROBOT_MAX_ENERGY
-            
-
-        #Reset turn action limiters
-        self.heal_used_this_turn = False
-        self.slots_attacked_this_turn.clear()
-
-
-
-    def attack_slot(self, attack_type, slot_id):
-        #Check if the attack type exists
-        if attack_type not in BOT_ATTACKS:
-            print("Error: Unknown attack type.")
-            return False
-
-        # slot_id is 1-based (1-6), array is 0-based (0-5)
-        if not (1 <= slot_id <= 6):
-            print("Error: Invalid slot ID. Must be between 1 and 6.")
-            return False
-
-        #Check rule: One attack per Slot
-        if slot_id in self.slots_attacked_this_turn:
-            print("Error: Slot has already been attacked this turn.")
-            return False
-
-        # Find the enemy in the global list
-        target_enemy = enemies[slot_id - 1]
-        if target_enemy is None:
-            print("Error: No enemy in slot {} to attack.".format(slot_id))
-            return False
-
-        #Get attack data
-        attack = BOT_ATTACKS[attack_type]
-        cost = attack["cost"]
-        damage = attack["damage"]
-
-        #Check if there is enough energy
-        if self.energy < cost:
-            print("Bot does not have enough energy to perform '{}'.".format(attack_type))
-            return False
-            
-        #Perform the attack
-        self.energy -= cost
-        target_enemy.receber_dano(damage)
-
-        #Mark slot as attacked
-        self.slots_attacked_this_turn.add(slot_id)
-        return True
-    
-
-
-
-    def heal(self, heal_type):
-        #Check if it has already healed this turn
-        if self.heal_used_this_turn:
-            print("Error: Can only use one heal per turn.")
-            return False
-
-        #Check if the heal type exists
-        if heal_type not in BOT_HEALS:
-            print("Error: Unknown heal type.")
-            return False
-            
-        heal_action = BOT_HEALS[heal_type]
-        cost = heal_action["cost"]
-        health_recovered = heal_action["health"]
-
-        #Check if there is enough energy
-        if self.energy < cost:
-            print("Bot tried to use '{}' (cost {}) but only has {:.0f} energy.".format(heal_type, cost, self.energy))
-            return False
-            
-        #Perform the heal
-        self.energy -= cost
-        self.health += health_recovered
-        
-        #Limit health to the maximum
-        if self.health > self.max_health:
-            self.health = self.max_health
-            
-
-        #Mark heal as used
-        self.heal_used_this_turn = True
-        
-        return True
-
-    def receber_dano(self, dano):
-        """Reduz a vida do robô e imprime o estado."""
-        self.health -= dano
-        if self.health < 0:
-            self.health = 0
-        
-        print("!!! O Defender-Bot sofreu {} de dano! Vida restante: {:.0f}/{} !!!".format(
-            dano, self.health, self.max_health
-        ))
-        
-        if not self.esta_vivo():
-            print("XXXXXXXX O DEFENDER-BOT FOI DESTRUIDO! XXXXXXXX")
-        
-        return self.health == 0
-
-    def esta_vivo(self):
-        """Retorna True se a vida do robô for maior que 0."""
-        return self.health > 0
-
-
-
-
-
-
-def initialize_robot():
-    """
-    Cria e retorna uma instância do DefenderBot.
-    """
-    print("\n--- Initializing Defender Bot ---")
-    bot = DefenderBot()
-    print("Defender Bot initialized with {:.0f} HP and {:.0f} Energy.".format(bot.health, bot.energy))
-    return bot
-
-
-def robot_turn_logic(bot, enemies_list):
-    """
-    Contém a lógica de decisão do DefenderBot para um turno.
-    Prioridade: Curar se a vida estiver baixa, depois atacar o inimigo mais forte.
-    """
-    print("\n--- FASE DE ACAO DO DEFENDER-BOT ---")
-    print("Bot vai agir com {:.0f} HP e {:.0f} Energia.".format(bot.health, bot.energy))
-
-    # --- 1. LÓGICA DE CURA ---
-    # Se a vida estiver abaixo de 500, tenta curar.
-    if bot.health < 500 and not bot.heal_used_this_turn:
-        # Tenta usar a cura mais forte primeiro
-        for heal_type in ["heal_3", "heal_2", "heal_1"]:
-            heal_info = BOT_HEALS[heal_type]
-            if bot.energy >= heal_info["cost"]:
-                print("Bot tem vida baixa ({:.0f} HP). A tentar usar '{}'.".format(bot.health, heal_type))
-                if bot.heal(heal_type):
-                    print("Bot usou '{}' e recuperou {} de vida. Vida atual: {:.0f}. Energia restante: {:.0f}.".format(
-                        heal_type, heal_info["health"], bot.health, bot.energy
-                    ))
-                    break # Para depois de uma cura bem-sucedida
-
-    # --- 2. LÓGICA DE ATAQUE ---
-    # Procura um alvo para atacar se tiver energia suficiente.
-    # Reserva estratégica de energia (200 para cura, 100 de base)
-    if bot.energy > 200:
-        # Encontra o inimigo vivo mais forte que ainda não foi atacado neste turno.
-        best_target = None
-        best_target_strength = -1
-        best_target_id = -1
-
-        for i, enemy in enumerate(enemies_list):
-            slot_id = i + 1
-            # Verifica se há um inimigo vivo e se o slot ainda não foi atacado
-            if enemy and enemy.esta_vivo() and slot_id not in bot.slots_attacked_this_turn:
-                if enemy.forca > best_target_strength:
-                    best_target = enemy
-                    best_target_strength = enemy.forca
-                    best_target_id = slot_id
-
-        # Se encontrou um alvo, ataca-o.
-        if best_target:
-            print("Bot escolheu como alvo o Slot {} ({}) com {} de forca.".format(
-                best_target_id, best_target.tipo, best_target.forca
-            ))
-
-            # --- LÓGICA DE ESCOLHA DE ATAQUE (Custo-Benefício) ---
-            attack_to_use = None
-            # 1. Se o inimigo for fraco, usa um ataque mais barato para o eliminar
-            if best_target.vida_atual <= BOT_ATTACKS["sound"]["damage"] and bot.energy >= BOT_ATTACKS["sound"]["cost"]:
-                attack_to_use = "sound"
-            elif best_target.vida_atual <= BOT_ATTACKS["touch"]["damage"] and bot.energy >= BOT_ATTACKS["touch"]["cost"]:
-                attack_to_use = "touch"
-            # 2. Se não, usa o ataque mais forte que puder pagar, mas mantendo uma reserva de 100 de energia.
-            elif bot.energy - BOT_ATTACKS["crane"]["cost"] > 100:
-                attack_to_use = "crane"
-            elif bot.energy - BOT_ATTACKS["touch"]["cost"] > 100:
-                attack_to_use = "touch"
-            elif bot.energy - BOT_ATTACKS["sound"]["cost"] > 100:
-                attack_to_use = "sound"
-
-            if attack_to_use:
-                print("Bot vai usar o ataque '{}'.".format(attack_to_use))
-                # A função attack_slot já imprime o resultado e atualiza o estado
-                bot.attack_slot(attack_type=attack_to_use, slot_id=best_target_id)
-                print("Energia restante do Bot: {:.0f}".format(bot.energy))
-            else:
-                print("Bot encontrou um alvo, mas nao tem energia para nenhum ataque.")
-        else:
-            print("Bot nao encontrou alvos validos para atacar ou ja atacou todos os inimigos vivos.")
-
-    else:
-        print("Bot esta a conservar energia (Energia: {:.0f}). Nao vai atacar.".format(bot.energy))
-
-    print("--- FIM DA FASE DE ACAO DO DEFENDER-BOT ---")
-
-def enemy_attack_phase(bot, enemies_list, current_turn):
-    """
-    Lógica de ataque de todos os inimigos contra o robô.
-    Um inimigo só ataca se o turno atual for maior que o seu turno de spawn.
-    """
-    print("\n--- FASE DE ATAQUE DOS INIMIGOS ---")
-    total_damage = 0
-    
-    for inimigo in enemies_list:
-        # Verifica se o inimigo existe, está vivo e se pode atacar neste turno
-        if inimigo and inimigo.esta_vivo() and current_turn > inimigo.turno_spawn:
-            dano_inimigo = inimigo.forca * inimigo.num_ataques
-            print("O inimigo '{}' (Slot com Spawn no turno {}) ataca o robo com {} de dano.".format(
-                inimigo.tipo, inimigo.turno_spawn, dano_inimigo
-            ))
-            total_damage += dano_inimigo
-
-    if total_damage > 0:
-        bot.receber_dano(total_damage)
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -717,97 +423,101 @@ def _leave_current_line(tank_pair, color_sensor, spin_speed):
     tank_pair.on(left_speed=SpeedPercent(spin_speed * -1), right_speed=SpeedPercent(spin_speed))
     
     print("Fora da linha.")
+# --- 1. The Music Worker Function ---
+def background_music_loop(stop_event):
+    """
+    Plays a wav file in a loop until the robot finishes scanning.
+    """
+    speaker = Sound()
+    
+    # CHANGE THIS to your exact file name. 
+    # Standard EV3 sounds: 'System/searching.wav', 'System/scanning.wav', 'Information/analyzing.wav'
+    # Custom files: '/home/robot/my_song.wav'
+    SOUND_FILE = 'search_song.wav' 
 
-# Função com a lógica principal do robot (loop)
+    while not stop_event.is_set():
+        try:
+            # play_type=1 (WAIT_FOR_COMPLETE) ensures the song finishes before restarting
+            speaker.play_file(SOUND_FILE, volume=100, play_type=Sound.PLAY_WAIT_FOR_COMPLETE)
+        except Exception as e:
+            # If the file isn't found, we print ONCE and stop trying to play to prevent spamming errors
+            print("!!! SOUND ERROR: Could not find file: {}".format(SOUND_FILE))
+            print("Switching to beep fallback...")
+            while not stop_event.is_set():
+                speaker.tone(440, 500)
+            return
+
+# --- 2. The Main Search Function ---
 def search_enemies(tank_pair, medium_motor, color_sensor, us_sensor, gyro, spin_speed, forward_speed):
-    """
-    Executes a 360-degree scan of the environment.
-    - Stores up to 6 enemies in an array (initialized to None).
-    - Starts checking at the current position (Line 1/Start).
-    - Rotates through the circle and returns to the start.
-    - Waits for 'Enter' to restart the process.
-    """
-
+    
+    # --- Configuration ---
     KP_GAIN = 1.5
-    
-    
-    # Define acceptable gyro error margin (e.g., 360 +/- 20 degrees)
     FULL_TURN_MIN_ANGLE = 340 
+    LINE_COLOR_NAME = 'Red'       # <--- Verify this matches your mat (Red/Blue/Black)
+    
+    # --- START MUSIC THREAD ---
+    stop_sound_event = threading.Event()
+    music_thread = threading.Thread(target=background_music_loop, args=(stop_sound_event,))
+    music_thread.daemon = True 
+    music_thread.start()
 
     try:
-                
-        # 1. Initialize Array with 6 Null values
+        # --- INITIALIZATION ---
         enemies_log = ["Empty"] * 6
-        
-        # 2. Reset Gyro and Accumulator
         gyro.reset()
-        accumulated_angle = 0 # Tracks total rotation across segments
+        accumulated_angle = 0 
         current_line_index = 0
-        
-        # Ensure we are stopped before starting
         tank_pair.off()
         
-        # --- PHASE 1: The 360 Loop ---
         scanning = True
-        is_start_position = True # Flag to handle the first line immediately
+        is_start_position = True 
 
+        # --- THE MAIN LOOP ---
         while scanning:
             
-            # A. Movement Logic (Skip on the first pass to check start line)
+            # A. MOVEMENT LOGIC
             if not is_start_position:
-                # Reset Gyro before moving to measure ONLY this segment.
-                # This fixes the issue where attack functions reset the gyro.
                 gyro.reset()
                 
-                # 1. Leave the current line (Blind Spin)
+                # 1. Start Spinning
                 tank_pair.on(left_speed=SpeedPercent(spin_speed * -1), right_speed=SpeedPercent(spin_speed))
                 sleep(0.5) 
 
-                # 2. Rotate until next Red line is found
+                # 2. Wait for Line
                 print("Searching for next line...")
                 while color_sensor.color_name != LINE_COLOR_NAME:
                     sleep(0.01)
                 
-                # Stop immediately upon finding the line
                 tank_pair.off()
                 
-                # 3. Add segment angle to total
+                # 3. Calculate Angle
                 segment_angle = abs(gyro.angle)
                 accumulated_angle += segment_angle
-                
-                print("Segment: {} | Total Angle: {}".format(segment_angle, accumulated_angle))
+                print("Angle: {} | Total: {}".format(segment_angle, accumulated_angle))
 
-                # --- NEW: Check for skipped lines based on angle ---
-                # Expected angle is 60 (360/6). A threshold of 90 is safe.
-                SKIPPED_LINE_ANGLE_THRESHOLD = 90
-                EXPECTED_SEGMENT_ANGLE = 60
-                
-                if segment_angle > SKIPPED_LINE_ANGLE_THRESHOLD and current_line_index < 5:
-                    # Calculate how many lines were likely skipped
-                    num_skipped = round(segment_angle / EXPECTED_SEGMENT_ANGLE) - 1
+                # 4. Check for Skips (Logic to detect if we missed a line)
+                if segment_angle > 90 and current_line_index < 5:
+                    num_skipped = round(segment_angle / 60) - 1
                     if num_skipped > 0:
-                        print("!!! Angle of {} is too large. Assuming {} line(s) were skipped.".format(segment_angle, num_skipped))
-                        # Advance the index, leaving the skipped slots as 'None' in the log
+                        print("Skipped {} lines.".format(num_skipped))
                         current_line_index += num_skipped
-                # ----------------------------------------------------
 
+                # 5. Check Completion
                 if accumulated_angle >= FULL_TURN_MIN_ANGLE or current_line_index == 6:
-                    print("--- 360 Turn Complete (Back at Start) ---")
+                    print("--- 360 Turn Complete ---")
                     scanning = False
                     break 
             
-            # B. Radar & Attack Logic
-            # (Executes for Start Line first, then subsequent lines)
-            
-            print("--- Processing Line/Slot {} ---".format(current_line_index + 1))
-            sleep(0.1) # Stabilize
+            # B. RADAR & ATTACK LOGIC
+            print("--- Checking Slot {} ---".format(current_line_index + 1))
+            sleep(0.2) 
             distance_cm = us_sensor.distance_centimeters
             
             if distance_cm < OBJECT_SEARCH_DISTANCE_CM:
-                print("Enemy detected at {}cm (Slot {})".format(distance_cm, current_line_index + 1))
+                print("Enemy detected at {}cm".format(distance_cm))
                 
-                # --- ACTION: Approach Enemy ---
-                # (Note: This function may reset gyro, but we handle that by resetting again before moving)
+                # --- ACTION: Approach ---
+                # (Ensure 'follow_line_until_obstacle' is defined in your file)
                 follow_line_until_obstacle(
                     tank_pair=tank_pair, gyro=gyro, color_sensor=color_sensor,
                     us_sensor=us_sensor, base_speed=forward_speed, kp=KP_GAIN
@@ -815,47 +525,47 @@ def search_enemies(tank_pair, medium_motor, color_sensor, us_sensor, gyro, spin_
                 
                 # --- ACTION: Log Color ---
                 detected_color = color_sensor.color_name
-                print("Logging Enemy Color: {}".format(detected_color))
-                
+                print("Logged Color: {}".format(detected_color))
                 if current_line_index < 6:
                     enemies_log[current_line_index] = detected_color
                 
                 # --- ACTION: Return ---
                 return_speed = forward_speed * -1
+                # (Ensure 'follow_line_return_to_distance' is defined in your file)
                 follow_line_return_to_distance(
                     tank_pair=tank_pair, gyro=gyro, color_sensor=color_sensor,
                     us_sensor=us_sensor, return_speed=return_speed, kp=KP_GAIN,
                     target_distance_cm=distance_cm - 0.8 
                 )
             else:
-                print("Slot {} is empty.".format(current_line_index + 1))
+                print("Slot {} is Empty".format(current_line_index + 1))
                 if current_line_index < 6:
                     enemies_log[current_line_index] = "Empty"
 
-            # Update state for next iteration
+            # Prepare for next loop
             is_start_position = False
             current_line_index += 1
             
-            # Safety break if we exceed array size (though gyro should stop it first)
             if current_line_index >= 6:
-                print("Max slots reached, returning to start...")
-                # Even if we hit 6 slots, we still need to physically return to start
-                # The loop will continue to 'Movement Logic', find start line, check angle, and break.
+                print("Max slots reached. Returning to start...")
+                # Loop continues to movement logic to spin back to start line
 
-        # --- PHASE 2: Report Results ---
-        print("\n--- SCAN FINISHED ---")
         return enemies_log
 
-    except KeyboardInterrupt:
-        print("\nScan interrupted by user.")
-        # Re-raise the exception so the main game loop can catch it and exit.
-        raise
-    except Exception as e:
-        print("Error during scan: {}".format(e))
     finally:
-        # Ensure motors are stopped if the function exits unexpectedly.
+        # --- CLEANUP ---
+        print("Stopping Music...")
+        
+        # 1. Signal the thread loop to stop (so it doesn't try to start the song again)
+        stop_sound_event.set()
+        
+        # 2. FORCE KILL the sound immediately
+        # This sends a system command to kill the 'aplay' process used by play_file
+        os.system("pkill aplay") 
+        
+        # 3. Join the thread and stop motors
+        music_thread.join(timeout=1) # Add a timeout so it doesn't hang
         tank_pair.off()
-
 
 
 # Função para inicializar do hardware
@@ -891,25 +601,19 @@ def initialize_hardware():
         return None, None, None, None, None
 
 
-def run_game_loop(bot, tank_pair, medium_motor, color_sensor, us_sensor, gyro, spin_speed, forward_speed):
+def run_game_loop(tank_pair, medium_motor, color_sensor, us_sensor, gyro, spin_speed, forward_speed):
     """
     Controla os turnos do jogo.
     """
     turn_count = 1
 
-
     try:
         while True:
             print("\n=== PREPARAR PARA O TURNO {} ===".format(turn_count))
-            # O robô recupera energia no início do seu turno.
-            bot.start_new_turn()
-            # Inimigos de turnos anteriores atacam o robô.
-            enemy_attack_phase(bot, enemies, turn_count)
-            print("Bot iniciou o turno com {:.0f} HP e {:.0f} Energia.".format(bot.health, bot.energy))
             
             # 1. Espera pelo Enter para começar
             input(">>> Pressione ENTER para procurar inimigos...")
-
+            
             # 2. Executa a pesquisa (retorna o log)
             enemies_log = search_enemies(
                 tank_pair=tank_pair,
@@ -927,7 +631,7 @@ def run_game_loop(bot, tank_pair, medium_motor, color_sensor, us_sensor, gyro, s
             # 4. Atualiza o array global 'enemies' com novos inimigos encontrados.
             #    Não substitui inimigos que já existem.
             print("\n--- A atualizar o estado dos inimigos ---")
-            novos_inimigos = inicializar_inimigos_por_cor(enemies_log, turn_count)
+            novos_inimigos = inicializar_inimigos_por_cor(enemies_log)
             
             for i, novo_inimigo in enumerate(novos_inimigos):
                 # Se o slot no array principal está vazio e um novo inimigo foi detectado
@@ -939,28 +643,11 @@ def run_game_loop(bot, tank_pair, medium_motor, color_sensor, us_sensor, gyro, s
             print("\n--- Campo de Batalha Atual (Turno {}) ---".format(turn_count))
             for i, inimigo in enumerate(enemies):
                 if inimigo is None:
-                    print("Posicao {}: Vazio".format(i+1))
+                    print("Posicao {}: Vazio".format(i))
                 else:
-                    print("Posicao {}: {}".format(i+1, inimigo))
+                    print("Posicao {}: {}".format(i, inimigo))
             print("turno acabado")
-
-            # --- TURNO DO ROBOT (LÓGICA DE AÇÃO) ---
-            # O robô decide se cura ou ataca com base no estado atualizado do jogo
-            robot_turn_logic(bot, enemies)
             
-            # --- VERIFICAR FIM DE JOGO ---
-            game_status = check_game_over(bot, enemies)
-            if game_status == "vitoria":
-                print("\n\n======================================")
-                print("VITORIA! Todos os inimigos foram destruidos!")
-                print("======================================")
-                break # Sai do loop do jogo
-            elif game_status == "derrota":
-                print("\n\n======================================")
-                print("DERROTA! O Defender-Bot foi destruido!")
-                print("======================================")
-                break # Sai do loop do jogo
-
             # 6. Incrementa o turno
             turn_count += 1
             print("-" * 30)
@@ -980,12 +667,11 @@ def main():
     
     if tank_pair is not None:
 
-        # --- PHASE 0: Initialize Bot and wait for Start ---
-        robot_player = initialize_robot()
+        # --- PHASE 0: Wait for Start ---
+        # Using input() to simulate waiting for "Enter" key in the console
         imprimir_setup_inicial()
         
         run_game_loop(
-            bot=robot_player,
             tank_pair=tank_pair,
             medium_motor=medium_motor, 
             color_sensor=color_sensor, 
