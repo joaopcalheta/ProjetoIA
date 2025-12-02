@@ -1,13 +1,14 @@
-from tools import play_wav
 from time import sleep, time
 from ev3dev2.motor import (SpeedPercent, MoveTank, MediumMotor, OUTPUT_A, OUTPUT_B, OUTPUT_C)
 from ev3dev2.sensor.lego import ColorSensor
+from ev3dev2.sound import Sound
 
 from config import LINE_COLOR_NAME
 
 # Ataque de som
 def sound_attack():
-    play_wav("nein.wav")
+    speaker = Sound()
+    speaker.beep()
 
 # Ataque de toque
 def touch_attack(tank_pair):

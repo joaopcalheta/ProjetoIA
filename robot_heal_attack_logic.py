@@ -1,6 +1,14 @@
 from robot_class import ROBOT_ATTACKS, ROBOT_HEALS, Robot
+from robot_movement_logic import rotate_perform_action_return
+from robot_attacks import sound_attack, touch_attack, crane_attack
+
+
+
+def teste():
+    print( "Teste")
+
 # Lógica de cura e de ataque do robot por turno
-def robot_turn_logic(robot, enemies_list):
+def robot_turn_logic(tank_pair,medium_motor, color_sensor, gyro, us_sensor,spin_speed, forward_speed, robot, enemies_list):
 
     # LÓGICA DE CURA
     
@@ -44,22 +52,39 @@ def robot_turn_logic(robot, enemies_list):
             # Se o inimigo for fraco, usa um ataque mais barato para o eliminar
             if best_target.current_health <= ROBOT_ATTACKS["sound"]["damage"] and robot.energy >= ROBOT_ATTACKS["sound"]["cost"]:
                 attack_to_use = "sound"
+                action_callback = sound_attack
             elif best_target.current_health <= ROBOT_ATTACKS["touch"]["damage"] and robot.energy >= ROBOT_ATTACKS["touch"]["cost"]:
                 attack_to_use = "touch"
+                action_callback=lambda: touch_attack(tank_pair)
+
             
             # Se não, usa o ataque mais forte que puder pagar, mas mantendo uma reserva de 100 de energia
             elif robot.energy - ROBOT_ATTACKS["crane"]["cost"] > 100:
                 attack_to_use = "crane"
+                action_callback= lambda: crane_attack(tank_pair, medium_motor, color_sensor)
             elif robot.energy - ROBOT_ATTACKS["touch"]["cost"] > 100:
                 attack_to_use = "touch"
+                action_callback=lambda: touch_attack(tank_pair)
             elif robot.energy - ROBOT_ATTACKS["sound"]["cost"] > 100:
                 attack_to_use = "sound"
+                action_callback = sound_attack
 
             if attack_to_use:
                 robot.attack_slot(attack_type=attack_to_use, slot_id=best_target_id, enemies=enemies_list)
                 print("O Robot usou o Ataque '{}' (Custo {}EN) no Inimigo {} do Slot {}, deu {} de dano. Energia restante: {:.0f}.".format(
                         attack_to_use, ROBOT_ATTACKS[attack_to_use]["cost"], best_target.type, best_target_id, ROBOT_ATTACKS[attack_to_use]["damage"] ,robot.energy
                     ))
+
+
+                rotate_perform_action_return(tank_pair=tank_pair,
+                    color_sensor=color_sensor, 
+                    gyro=gyro,
+                    us_sensor=us_sensor, 
+                    spin_speed=spin_speed,
+                    forward_speed=forward_speed,
+                    target_line_index=best_target_id-1,
+                    action_callback=action_callback)
+
                 if(not best_target.is_alive()):
                     print("O inimigo {} morreu.".format(best_target.type))
             else:

@@ -50,7 +50,8 @@ def run_game_loop(robot, tank_pair, medium_motor, color_sensor, us_sensor, gyro,
                 us_sensor=us_sensor, 
                 gyro=gyro,
                 spin_speed=spin_speed,
-                forward_speed=forward_speed
+                forward_speed=forward_speed,
+                enemies=enemies
             )
 
             # Imprime os resultados do turno
@@ -75,7 +76,16 @@ def run_game_loop(robot, tank_pair, medium_motor, color_sensor, us_sensor, gyro,
 
             # Robot utiliza a cura e ataques que pode fazer no turno
             print("FASE DE ATAQUE / CURA DO ROBOT")
-            robot_turn_logic(robot, enemies)
+            robot_turn_logic(
+                tank_pair=tank_pair,
+                medium_motor=medium_motor, 
+                color_sensor=color_sensor, 
+                gyro=gyro,
+                us_sensor=us_sensor, 
+                spin_speed=spin_speed,
+                forward_speed=forward_speed,
+                robot=robot, 
+                enemies_list=enemies)
             
              # Imprime o estado atual do campo de batalha
             print("\n--- Campo de Batalha Apos Ataques (Turno {}) ---".format(current_turn))
@@ -106,6 +116,7 @@ def run_game_loop(robot, tank_pair, medium_motor, color_sensor, us_sensor, gyro,
 
 
 import os
+
 def main():
 
 

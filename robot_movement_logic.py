@@ -155,16 +155,16 @@ def follow_line_until_obstacle(tank_pair, gyro, color_sensor, us_sensor, base_sp
 
 
 # Faz o reconhecimento do ambiente do novo turno
-def search_enemies(tank_pair, medium_motor, color_sensor, us_sensor, gyro, spin_speed, forward_speed):
+def search_enemies(tank_pair, medium_motor, color_sensor, us_sensor, gyro, spin_speed, forward_speed, enemies):
 
     KP_GAIN = 1.5
     
     FULL_TURN_MIN_ANGLE = 340 
 
-    # stop_sound_event = threading.Event()
-    # music_thread = threading.Thread(target=background_music_loop, args=(stop_sound_event,))
-    # music_thread.daemon = True 
-    # music_thread.start()
+    stop_sound_event = threading.Event()
+    music_thread = threading.Thread(target=background_music_loop, args=(stop_sound_event,))
+    music_thread.daemon = True 
+    music_thread.start()
 
     try:
         enemies_log = ["Empty"] * 6
@@ -218,26 +218,26 @@ def search_enemies(tank_pair, medium_motor, color_sensor, us_sensor, gyro, spin_
             
             if distance_cm < OBJECT_SEARCH_DISTANCE_CM:
                 print("Inimigo detetado a {}cm (Slot {})".format(distance_cm, current_line_index + 1))
+                if(enemies[current_line_index] is None):
                 
-                # Aproxima-se do inimigo
-                follow_line_until_obstacle(
-                    tank_pair=tank_pair, gyro=gyro, color_sensor=color_sensor,
-                    us_sensor=us_sensor, base_speed=forward_speed, kp=KP_GAIN
-                )
-                
-                # Guarda a cor detetada
-                detected_color = color_sensor.color_name # O 'ã' em 'detetada' foi removido para evitar erros de codificacao.
-                print("Cor detetada: {}".format(detected_color))
-                if current_line_index < 6:
-                    enemies_log[current_line_index] = detected_color
-                
-                # Regressa ao centro
-                return_speed = forward_speed * -1
-                follow_line_return_to_distance(
-                    tank_pair=tank_pair, gyro=gyro, color_sensor=color_sensor,
-                    us_sensor=us_sensor, return_speed=return_speed, kp=KP_GAIN, # O 'â' em 'distancia' foi removido para evitar erros de codificacao.
-                    target_distance_cm=distance_cm - 0.8 
-                )
+                    follow_line_until_obstacle(
+                        tank_pair=tank_pair, gyro=gyro, color_sensor=color_sensor,
+                        us_sensor=us_sensor, base_speed=forward_speed, kp=KP_GAIN
+                    )
+                    
+                    # Guarda a cor detetada
+                    detected_color = color_sensor.color_name # O 'ã' em 'detetada' foi removido para evitar erros de codificacao.
+                    print("Cor detetada: {}".format(detected_color))
+                    if current_line_index < 6:
+                        enemies_log[current_line_index] = detected_color
+                    
+                    # Regressa ao centro
+                    return_speed = forward_speed * -1
+                    follow_line_return_to_distance(
+                        tank_pair=tank_pair, gyro=gyro, color_sensor=color_sensor,
+                        us_sensor=us_sensor, return_speed=return_speed, kp=KP_GAIN, # O 'â' em 'distancia' foi removido para evitar erros de codificacao.
+                        target_distance_cm=distance_cm - 0.8 
+                    )
             else:
                 print("O Slot {} esta vazio.".format(current_line_index + 1))
                 if current_line_index < 6:
@@ -257,13 +257,127 @@ def search_enemies(tank_pair, medium_motor, color_sensor, us_sensor, gyro, spin_
     except Exception as e:
         print("Error during scan: {}".format(e))
     finally:
-        # print("Parando a musica")
+        print("Parando a musica")
 
-        # stop_sound_event.set()
-
-
-        # os.system("pkill aplay") 
+        stop_sound_event.set()
 
 
-        # music_thread.join(timeout=1)
+        os.system("pkill aplay") 
+
+
+        music_thread.join(timeout=1)
+        tank_pair.off()
+
+
+def rotate_perform_action_return(tank_pair, color_sensor, gyro, us_sensor, spin_speed, forward_speed, target_line_index, action_callback):
+    """
+    Rotates to a specific line, approaches the enemy, performs an action, 
+    returns to center, and completes the rotation.
+    """
+    
+    # Constants
+    FULL_TURN_MIN_ANGLE = 340
+    SKIPPED_LINE_ANGLE_THRESHOLD = 90
+    EXPECTED_SEGMENT_ANGLE = 60
+    KP_GAIN = 1.5
+    
+    try:
+        gyro.reset()
+        accumulated_angle = 0
+        current_line_index = 0
+        
+        tank_pair.off()
+        is_start_position = True
+        scanning = True
+
+        print("Starting rotation. Target: Line {}".format(target_line_index))
+
+        while scanning:
+            
+            if not is_start_position:
+                gyro.reset()
+                
+                # 1. Move off the current line
+                tank_pair.on(left_speed=SpeedPercent(spin_speed * -1), right_speed=SpeedPercent(spin_speed))
+                sleep(0.5) 
+
+                # 2. Rotate until next line is found
+                while color_sensor.color_name != LINE_COLOR_NAME:
+                    sleep(0.01)
+                
+                tank_pair.off()
+
+                # 3. Calculate Angles
+                segment_angle = abs(gyro.angle)
+                accumulated_angle += segment_angle
+                
+                if segment_angle > SKIPPED_LINE_ANGLE_THRESHOLD and current_line_index < 5:
+                    num_skipped = round(segment_angle / EXPECTED_SEGMENT_ANGLE) - 1
+                    if num_skipped > 0:
+                        current_line_index += num_skipped
+
+                current_line_index += 1
+                print("Arrived at Line {}".format(current_line_index))
+
+                # --- TARGET REACHED LOGIC ---
+                if current_line_index == target_line_index:
+                    print("Target line reached. Measuring distance...")
+                    
+                    # Get distance to know where to return to later
+                    distance_cm = us_sensor.distance_centimeters
+                    
+                    # Only approach if something is actually there (optional safety check)
+                    if distance_cm < OBJECT_SEARCH_DISTANCE_CM:
+                        
+                        print("Approaching enemy...")
+                        # A. Approach the enemy
+                        follow_line_until_obstacle(
+                            tank_pair=tank_pair, 
+                            gyro=gyro, 
+                            color_sensor=color_sensor,
+                            us_sensor=us_sensor, 
+                            base_speed=forward_speed, 
+                            kp=KP_GAIN
+                        )
+                        
+                        # Stop to stabilize
+                        tank_pair.off()
+                        sleep(0.5)
+
+                        # B. Execute the specific strategy (Attack/Rescue)
+                        print("Executing Action...")
+                        action_callback()
+                        
+                        # C. Return to center
+                        print("Returning to center...")
+                        return_speed = forward_speed * -1
+                        follow_line_return_to_distance(
+                            tank_pair=tank_pair, 
+                            gyro=gyro, 
+                            color_sensor=color_sensor,
+                            us_sensor=us_sensor, 
+                            return_speed=return_speed, 
+                            kp=KP_GAIN, 
+                            target_distance_cm=distance_cm - 2 # Small buffer
+                        )
+                    else:
+                        print("Warning: Target line reached, but no object detected nearby.")
+                   
+
+                    print("Action sequence complete. Resuming rotation...")
+
+                # --- COMPLETION CHECK ---
+                if accumulated_angle >= FULL_TURN_MIN_ANGLE or current_line_index >= 6:
+                    print("Full turn complete. Back at start.")
+                    scanning = False
+                    break 
+            
+            is_start_position = False
+            
+    except KeyboardInterrupt:
+        print("\nProcess interrupted by user.")
+        raise
+    except Exception as e:
+        print("Error during rotation: {}".format(e))
+    finally:
         tank_pair.off()

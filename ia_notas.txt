@@ -20,10 +20,10 @@ COISAS PARA FAZER / ERROS QUE DETETEI PARA JÁ:
 (provavelmente tem muito mais que vamos descobrir entretanto)
 FEITO1- a função check_game_status só deve retornar vitoria após spawnar todos os inimigo e quando eles morrerem todos, a logica nao deve ser só verificar se estão vivos ou mortos, visto que vao aparecer novos até ao turno 6. uma possivel solucao era verificar se existe algum slot vazio, significa que o jogo nao pode terminar, portanto a condicao de verificar se todos os inimigos tao mortos para dar vitoria, deve ser feita se for garantida que nao existe nenhum slot vazio
 2- o robot deve poder atacar mais do que um inimigo/slot por turno, só nao pode atacar a mesmo inimigo/slot
-3- quando o robot faz reconhecimento do ambiente, quando deteta alguma coisa, só deve ir à frente se no turno anterior nao tiver sido encontrado nada naquele slot (um forma de resolver isto seria atraves do array global de inimigos, o robot só deve ir aos indices vazios)
-4- reconhecimento do ambiente deve parar a partir do setimo turno
-5- o inimigo tem numero de ataques limitados, é necessário deduzir nr de ataques após fazer um ataque (terá de ser feito na funcao enemy_attack_phase)
-6- no primeiro turno isto nao deve acontecer (a solucao é um if a dizer que se ta no primeiro turno para ignorar):
+3 FEITO- quando o robot faz reconhecimento do ambiente, quando deteta alguma coisa, só deve ir à frente se no turno anterior nao tiver sido encontrado nada naquele slot (um forma de resolver isto seria atraves do array global de inimigos, o robot só deve ir aos indices vazios)
+4 "FEITO"- reconhecimento do ambiente deve parar a partir do setimo turno
+5 FEITO- o inimigo tem numero de ataques limitados, é necessário deduzir nr de ataques após fazer um ataque (terá de ser feito na funcao enemy_attack_phase)
+6 FEITO- no primeiro turno isto nao deve acontecer (a solucao é um if a dizer que se ta no primeiro turno para ignorar):
 			robot.start_new_turn()
 			print("ROBOT RECUPERA 50% DE ENERGIA E DÁ RESET NOS REGISTOS DE ATAQUES E CURAS DO TURNO ANTERIOR")
 						
@@ -33,7 +33,8 @@ FEITO1- a função check_game_status só deve retornar vitoria após spawnar tod
 7 FEITO - tem de dizer que matou quando ataca(classe enemigo)
 8 FEITO - no fim do turno aparece a tabela com a vida
 9 - FEITO  quando o inimgio da dano temos de dizer qual e o slot
-10 - adicionar musica NAO FUNCIONA //// O problema em principio e a funcao, ou como e chamada no search enemies
+10 FEITO- adicionar musica 
+11 FEITO- adicionar aldrabice no yellow para reconhecer brown tambem
 
 CAGATIVO POR ENQUANTO:
 1- devera ser possivel o robot desistir se perceber que nao tem hipoteses de ganhar, é preciso dessa logica

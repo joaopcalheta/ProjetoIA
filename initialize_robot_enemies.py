@@ -4,7 +4,7 @@ from ev3dev2.motor import (SpeedPercent, MoveTank, MediumMotor, OUTPUT_A, OUTPUT
 from ev3dev2.sensor.lego import ColorSensor, UltrasonicSensor, GyroSensor
 from ev3dev2.sensor import INPUT_1, INPUT_2, INPUT_4
 
-from tools import play_wav, print_initial_setup, roll_digital_dice, clamp_speed
+from tools import print_initial_setup, roll_digital_dice, clamp_speed
 from enemy_class import ENEMY_STATS, Enemy
 from robot_class import ROBOT_ATTACKS, ROBOT_HEALS, Robot
 from robot_attacks import touch_attack, sound_attack, crane_attack

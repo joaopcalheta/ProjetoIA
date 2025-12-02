@@ -1,14 +1,7 @@
 from ev3dev2.sound import Sound
+import os
 import random
 
-# Tocar ficheiro WAV
-def play_wav(file_path, volume=100):
-    try:
-        speaker = Sound()
-        speaker.set_volume(volume)
-        speaker.play_file(file_path)
-    except:
-        pass
 
 
 # Rola dado 
@@ -57,14 +50,15 @@ def background_music_loop(stop_event):
     # CHANGE THIS to your exact file name. 
     # Standard EV3 sounds: 'System/searching.wav', 'System/scanning.wav', 'Information/analyzing.wav'
     # Custom files should have an absolute path, e.g., '/home/robot/ProjetoIA/my_song.wav'
-    SOUND_FILE = '/home/robot/ProjetoIA/search_song.wav' 
+    SOUND_FILE = 'search_song.wav'
+
 
     while not stop_event.is_set():
         try:
             # play_type=1 (WAIT_FOR_COMPLETE) ensures the song finishes before restarting
-            speaker.play_file("search_song.wav", volume=100, play_type=Sound.PLAY_REPEAT)
+            speaker.play_file(SOUND_FILE, volume=100)
         except Exception as e:
             # If the file isn't found, we print ONCE and stop trying to play to prevent spamming errors
-            print("!!! SOUND ERROR: Could not find file: {}".format(SOUND_FILE))
+            print("!!! SOUND ERROR: Could not find file: {}".format(e))
             print("Switching to beep fallback...")
             return
