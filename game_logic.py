@@ -17,8 +17,6 @@ def check_game_status(robot, enemies_list):
 
 
 
-
-
 # Informa do fim de jogo
 def handle_game_over(game_status):
     if game_status == "victory":

@@ -9,9 +9,9 @@ def roll_digital_dice():
     return random.randint(1, 6)
 
 
+
 # Imprime a tabela do enunciado preenchida
 def print_initial_setup():
-    # O 'ç' em 'Posicao' foi removido para evitar erros de codificacao.
     print("=" * 60)
     print("{:<10} | {:<18} | {:<20}".format("Posicao", "Tipo de atacante", "Turno inicial (1-6)"))
     print("=" * 60)
@@ -21,15 +21,16 @@ def print_initial_setup():
         dice_turn = roll_digital_dice()
     
         if dice_type <= 2:
-            unit = "Tanque"
+            unit = "Tanque (Verde)"
         elif dice_type <= 4:
-            unit = "Artilharia"
+            unit = "Artilharia (Amarelo)"
         else:
-            unit = "Infantaria"
+            unit = "Infantaria (Azul)"
     
         print("Slot{:<4} | {:<18} | {:<20}".format(i, unit, dice_turn))
     
     print("=" * 60)
+
 
 
 # Garante que a velocidade do motor está entre -100 e 100
@@ -41,24 +42,17 @@ def clamp_speed(speed):
     return speed
 
 
+
+# Toca musica de fundo em loop até o evento de paragem ser ativado
+# Usado para tocar musica enquanto o robo faz o reconhecimento do ambiente
 def background_music_loop(stop_event):
-    """
-    Plays a wav file in a loop until the robot finishes scanning.
-    """
     speaker = Sound()
     
-    # CHANGE THIS to your exact file name. 
-    # Standard EV3 sounds: 'System/searching.wav', 'System/scanning.wav', 'Information/analyzing.wav'
-    # Custom files should have an absolute path, e.g., '/home/robot/ProjetoIA/my_song.wav'
     SOUND_FILE = 'search_song.wav'
-
 
     while not stop_event.is_set():
         try:
-            # play_type=1 (WAIT_FOR_COMPLETE) ensures the song finishes before restarting
             speaker.play_file(SOUND_FILE, volume=100)
         except Exception as e:
-            # If the file isn't found, we print ONCE and stop trying to play to prevent spamming errors
-            print("!!! SOUND ERROR: Could not find file: {}".format(e))
-            print("Switching to beep fallback...")
+            print("Erro: Nao foi possivel encontrar o ficheiro de musica 'search_song.wav': {}".format(e))
             return
