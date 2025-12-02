@@ -1,9 +1,13 @@
 from time import sleep, time
+import random
+import threading
+import os
 from ev3dev2.motor import (SpeedPercent, MoveTank, MediumMotor, OUTPUT_A, OUTPUT_B, OUTPUT_C)
 from ev3dev2.sensor.lego import ColorSensor, UltrasonicSensor, GyroSensor
 from ev3dev2.sensor import INPUT_1, INPUT_2, INPUT_4
 from tools import clamp_speed
 from config import OBJECT_SEARCH_DISTANCE_CM, LINE_COLOR_NAME, SPIN_SEARCH_SPEED, SEARCH_TIME_LEFT_S, SEARCH_TIME_RIGHT_S
+from tools import background_music_loop
 
 
 # Segue em linha reta com correção do giroscópio
@@ -157,6 +161,11 @@ def search_enemies(tank_pair, medium_motor, color_sensor, us_sensor, gyro, spin_
     
     FULL_TURN_MIN_ANGLE = 340 
 
+    # stop_sound_event = threading.Event()
+    # music_thread = threading.Thread(target=background_music_loop, args=(stop_sound_event,))
+    # music_thread.daemon = True 
+    # music_thread.start()
+
     try:
         enemies_log = ["Empty"] * 6
         gyro.reset()
@@ -248,4 +257,13 @@ def search_enemies(tank_pair, medium_motor, color_sensor, us_sensor, gyro, spin_
     except Exception as e:
         print("Error during scan: {}".format(e))
     finally:
+        # print("Parando a musica")
+
+        # stop_sound_event.set()
+
+
+        # os.system("pkill aplay") 
+
+
+        # music_thread.join(timeout=1)
         tank_pair.off()

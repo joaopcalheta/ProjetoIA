@@ -6,7 +6,6 @@ from enemy_attack_logic import enemy_attack_phase
 from initialize_robot_enemies import initialize_robot, initialize_enemies_by_color
 from robot_movement_logic import search_enemies
 from config import (OBSTACLE_STOP_DISTANCE_CM, OBJECT_SEARCH_DISTANCE_CM, LINE_COLOR_NAME, SPIN_SEARCH_SPEED, SEARCH_TIME_LEFT_S, SEARCH_TIME_RIGHT_S)
-
 enemies = [None] * 6               # Array global para armazenar os inimigos
 
 
@@ -78,6 +77,16 @@ def run_game_loop(robot, tank_pair, medium_motor, color_sensor, us_sensor, gyro,
             print("FASE DE ATAQUE / CURA DO ROBOT")
             robot_turn_logic(robot, enemies)
             
+             # Imprime o estado atual do campo de batalha
+            print("\n--- Campo de Batalha Apos Ataques (Turno {}) ---".format(current_turn))
+            for i, enemy in enumerate(enemies):
+                if enemy is None:
+                    print("Posicao {}: Vazio".format(i+1)) # O 'ç' em 'Posicao' foi removido para evitar erros de codificacao.
+                else:
+                    print("Posicao {}: {}".format(i+1, enemy)) # O 'ç' em 'Posicao' foi removido para evitar erros de codificacao.
+
+
+
             game_status = check_game_status(robot, enemies)
             if((current_turn > 6 and game_status == "victory") or game_status == "defeat"):
                 handle_game_over(game_status)
@@ -96,7 +105,10 @@ def run_game_loop(robot, tank_pair, medium_motor, color_sensor, us_sensor, gyro,
         medium_motor.off()
 
 
+import os
 def main():
+
+
     tank_pair, medium_motor, color_sensor, us_sensor, gyro_sensor = initialize_hardware()
     
     if tank_pair is not None:

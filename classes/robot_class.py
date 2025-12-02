@@ -76,6 +76,10 @@ class DefenderBot:
         # Let's simulate:
         target_slot.enemy.health -= damage
         
+        if(target_slot.enemy.is_alive()):
+            print("O inimigo {} morreu.".format(target_slot.enemy.type))
+
+        
 
         #Mark slot as attacked
         self.slots_attacked_this_turn.add(target_slot.id)

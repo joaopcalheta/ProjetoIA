@@ -46,3 +46,25 @@ def clamp_speed(speed):
     if speed < -100:
         return -100
     return speed
+
+
+def background_music_loop(stop_event):
+    """
+    Plays a wav file in a loop until the robot finishes scanning.
+    """
+    speaker = Sound()
+    
+    # CHANGE THIS to your exact file name. 
+    # Standard EV3 sounds: 'System/searching.wav', 'System/scanning.wav', 'Information/analyzing.wav'
+    # Custom files should have an absolute path, e.g., '/home/robot/ProjetoIA/my_song.wav'
+    SOUND_FILE = '/home/robot/ProjetoIA/search_song.wav' 
+
+    while not stop_event.is_set():
+        try:
+            # play_type=1 (WAIT_FOR_COMPLETE) ensures the song finishes before restarting
+            speaker.play_file("search_song.wav", volume=100, play_type=Sound.PLAY_REPEAT)
+        except Exception as e:
+            # If the file isn't found, we print ONCE and stop trying to play to prevent spamming errors
+            print("!!! SOUND ERROR: Could not find file: {}".format(SOUND_FILE))
+            print("Switching to beep fallback...")
+            return

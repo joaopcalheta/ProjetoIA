@@ -30,10 +30,10 @@ FEITO1- a função check_game_status só deve retornar vitoria após spawnar tod
 			# Inimigos do turno anterior que o robot não conseguiu matar atacam
 			print("FASE DE ATAQUE DOS INIMIGOS")
 			enemy_attack_phase(robot, enemies, current_turn)
-7 - tem de dizer que matou quando ataca(classe enemigo)
-8 - no fim do turno aparece a tabela com a vida
-9 - quando o inimgio da dano temos de dizer qual e o slot
-10 - adicionar musica
+7 FEITO - tem de dizer que matou quando ataca(classe enemigo)
+8 FEITO - no fim do turno aparece a tabela com a vida
+9 - FEITO  quando o inimgio da dano temos de dizer qual e o slot
+10 - adicionar musica NAO FUNCIONA //// O problema em principio e a funcao, ou como e chamada no search enemies
 
 CAGATIVO POR ENQUANTO:
 1- devera ser possivel o robot desistir se perceber que nao tem hipoteses de ganhar, é preciso dessa logica

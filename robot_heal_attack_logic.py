@@ -60,6 +60,8 @@ def robot_turn_logic(robot, enemies_list):
                 print("O Robot usou o Ataque '{}' (Custo {}EN) no Inimigo {} do Slot {}, deu {} de dano. Energia restante: {:.0f}.".format(
                         attack_to_use, ROBOT_ATTACKS[attack_to_use]["cost"], best_target.type, best_target_id, ROBOT_ATTACKS[attack_to_use]["damage"] ,robot.energy
                     ))
+                if(not best_target.is_alive()):
+                    print("O inimigo {} morreu.".format(best_target.type))
             else:
                 print("O Robot encontrou um alvo, mas decidiu nao atacar. Ficaria com Energia inferior a 100 se atacasse com o Ataque mais barato.") # O 'ã' em 'nao' foi removido para evitar erros de codificacao.
         else:

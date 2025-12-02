@@ -37,7 +37,7 @@ def initialize_enemies_by_color(color_list, current_turn):
                     break
             
             if found_type:
-                new_enemy = Enemy(found_type, current_turn)
+                new_enemy = Enemy(found_type, current_turn, i+1)
                 enemy_object_list.append(new_enemy)
                 print("Slot {}: Criado inimigo '{}' (Cor: {})".format(i+1, found_type, color))
             else:
