@@ -15,6 +15,7 @@ def run_game_loop(robot, tank_pair, medium_motor, color_sensor, us_sensor, gyro,
     
     current_turn = 1
 
+
     try:
         while True:
             print("\n=== TURNO {} ===".format(current_turn))
