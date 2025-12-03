@@ -16,8 +16,6 @@ def enemy_attack_phase(robot, enemies_list, current_turn):
             if enemy.num_attacks_available == 0:
                 print("O Inimigo '{}' acabou os seus ataques".format(enemy.type))
     
-
-
     if total_damage > 0:
         robot.receive_damage(total_damage)
     

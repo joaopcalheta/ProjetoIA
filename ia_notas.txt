@@ -1,15 +1,9 @@
-PRIMEIRA COISA A FAZER:
-(em primeiro lugar peço desculpa se, o que muito provavelmente vai acontecer, o meu zip tiver com problemas inicialmente (nao tenho como testar))
-- correr o robot com os ficheiros do meu zip e ver se tá tudo a funcionar direito (eu tive cuidado, mas é possivel possa haver problemas de esquecimentos de imports de funcoes de outros ficheiros, alguma letra que nao pode ser usada tipo ç,á etc ou entao variaveis mudadas q ja n existem)
-- se tiver tudo bem, vai ser melhor começar a trabalhar com esta versao do projeto do que a confusao atual, até para poder entregar ao prof. acho que vamos ser mais produtivos com o projeto desta forma.
-- Mensagem para o Luis: tem um bloco de comentarios que tu meteste no final do main, ve se isso é util ou se podemos apagar
-
 CONFIRMAR SE TÁ A FUNCIONAR:
 1- inimigos só podem atacar no turno seguinte a spawnarem
 2- robot morre e jogo acaba (meter 6 inimigos fortes de inicio para ele morrer logo no inicio do turno 2 e testar)
 
 NOVAS REGRAS A PARTIR DE AGORA:
-- codigo ta todo em ingles, é probido usar variaveis em portugues
+- codigo ta todo em ingles, n usar variaveis em portugues
 - nao aceitar coisas do gemini à toa, principalmente se ele alterar coisas fora do pedido (como tem acontecido com a distancia do inimigo 40 pa 30)
 
 DUVIDAS:
@@ -35,6 +29,8 @@ FEITO1- a função check_game_status só deve retornar vitoria após spawnar tod
 9 - FEITO  quando o inimgio da dano temos de dizer qual e o slot
 10 FEITO- adicionar musica 
 11 FEITO- adicionar aldrabice no yellow para reconhecer brown tambem
+12- musica vitoria e derrota
+13-Mensagem para o Luis: tem um bloco de comentarios que tu meteste no final do main, ve se isso é util ou se podemos apagar
 
 CAGATIVO POR ENQUANTO:
 1- devera ser possivel o robot desistir se perceber que nao tem hipoteses de ganhar, é preciso dessa logica

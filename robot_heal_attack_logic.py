@@ -88,9 +88,9 @@ def robot_turn_logic(tank_pair,medium_motor, color_sensor, gyro, us_sensor,spin_
                 if(not best_target.is_alive()):
                     print("O inimigo {} morreu.".format(best_target.type))
             else:
-                print("O Robot encontrou um alvo, mas decidiu nao atacar. Ficaria com Energia inferior a 100 se atacasse com o Ataque mais barato.") # O 'ã' em 'nao' foi removido para evitar erros de codificacao.
+                print("O Robot encontrou um alvo, mas decidiu nao atacar. Ficaria com Energia inferior a 100 se atacasse com o Ataque mais barato.")
         else:
-            print("O Robot nao encontrou alvos validos. Ou ja atacou todos os inimigos neste turno, ou ainda nao existem inimigos ou ja estao todos mortos.") # O 'ã' em 'nao' foi removido para evitar erros de codificacao.
+            print("O Robot nao encontrou alvos validos. Ou ja atacou todos os inimigos neste turno, ou ainda nao existem inimigos ou ja estao todos mortos.")
 
     else:
         print("O Robot esta a conservar energia porque esta abaixo de 200 (Energia atual: {:.0f}EN) e nao vai atacar.".format(robot.energy))
