@@ -28,20 +28,24 @@ def initialize_enemies_by_color(color_list, current_turn):
     for i, color in enumerate(color_list):
         if color == "Empty":
             enemy_object_list.append(None) 
+
         else:
             found_type = None
-            
+            color_found = color
+            if color_found == "Yellow":
+                color_found = "Brown"
+
             for type, stats in ENEMY_STATS.items():
-                if stats['color'] == color:
+                if stats['color'] == color_found:
                     found_type = type
                     break
             
             if found_type:
                 new_enemy = Enemy(found_type, current_turn, i+1)
                 enemy_object_list.append(new_enemy)
-                print("Slot {}: Criado inimigo '{}' (Cor: {})".format(i+1, found_type, color))
+                print("Slot {}: Criado inimigo '{}' (Cor: {})".format(i+1, found_type, color_found))
             else:
-                print("Slot {}: Inimigo ignorado (Cor desconhecida: '{}').".format(i+1, color))
+                print("Slot {}: Inimigo ignorado (Cor desconhecida: '{}').".format(i+1, color_found))
                 enemy_object_list.append(None)
 
     return enemy_object_list
