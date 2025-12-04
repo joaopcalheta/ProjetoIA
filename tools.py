@@ -56,3 +56,9 @@ def background_music_loop(stop_event):
         except Exception as e:
             print("Erro: Nao foi possivel encontrar o ficheiro de musica 'search_song.wav': {}".format(e))
             return
+
+
+
+def playSound(sound):
+    speaker = Sound()
+    speaker.play_file(sound, volume=100)
