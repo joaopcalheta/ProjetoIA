@@ -267,7 +267,7 @@ def search_enemies(tank_pair, medium_motor, color_sensor, us_sensor, gyro, spin_
 
 # Gira o robot no centro do campo de batalha até encontrar a linha do slot alvo.
 # Uma vez na linha correta, avança em direção ao inimigo, executa uma ação (ataque) e depois regressa à sua posição inicial no centro.
-def rotate_perform_action_return(tank_pair, color_sensor, gyro, us_sensor, spin_speed, forward_speed, target_line_index, action_callback):
+def rotate_perform_action_return(tank_pair, color_sensor, gyro, us_sensor, spin_speed, forward_speed, scheduled_actions):
 
     FULL_TURN_MIN_ANGLE = 340           # Ângulo mínimo para considerar que o robot deu uma volta completa
     SKIPPED_LINE_ANGLE_THRESHOLD = 90   # Ângulo acima do qual o robot considera que saltou uma ou mais linhas
@@ -277,9 +277,9 @@ def rotate_perform_action_return(tank_pair, color_sensor, gyro, us_sensor, spin_
     # Funcao para atacar
     def check_and_attack(current_idx):
        
-        # Verifica se o índice da linha atual corresponde ao do alvo
-        if current_idx == target_line_index:
-            print("Linha alvo {} alcancada. A verificar se existe inimigo...".format(current_idx))
+        # Verifica se o índice da linha atual esta na lista de acoes agendadas
+        if current_idx in scheduled_actions:
+            print("Linha {} (Alvo) alcancada. A verificar se existe inimigo...".format(current_idx))
             
             sleep(0.1) 
             distance_cm = us_sensor.distance_centimeters
@@ -302,7 +302,7 @@ def rotate_perform_action_return(tank_pair, color_sensor, gyro, us_sensor, spin_
                 sleep(0.5)
 
                 # Executa a ação de ataque passada como callback
-                action_callback()
+                scheduled_actions[current_idx]()
                 
                 # Recua para a distância original para se preparar para a próxima rotação
                 return_speed = forward_speed * -1
@@ -331,7 +331,7 @@ def rotate_perform_action_return(tank_pair, color_sensor, gyro, us_sensor, spin_
         current_line_index = 0
         scanning = True
         
-        print("A iniciar rotina de rotacao. Alvo: Linha {}".format(target_line_index))
+        print("A iniciar rotina de rotacao para ataques multiplos. Alvos: {}".format(list(scheduled_actions.keys())))
         
         # Verifica a posição inicial (linha 0) antes de começar a girar
         check_and_attack(current_line_index)

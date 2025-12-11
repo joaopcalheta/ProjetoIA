@@ -28,69 +28,114 @@ def robot_turn_logic(tank_pair,medium_motor, color_sensor, gyro, us_sensor,spin_
 
     # LÓGICA DE ATAQUE
 
-    # Vai tentar atacar se tiver mais de 200 de energia
-    if robot.energy > 200:
+    # Dicionario para armazenar as acoes planeadas: { indice_linha: callback_funcao }
+    scheduled_actions = {}
+    temp_energy = robot.energy
+    temp_slots_attacked = set()
+
+    # Loop de planeamento: escolhe multiplos alvos enquanto houver energia
+    while True:
         
-        # Encontra o inimigo vivo mais forte que ainda não foi atacado neste turno
-        best_target = None
-        best_target_strength = -1
-        best_target_id = -1
+        # 1. Identificar candidatos validos (vivos e nao atacados neste turno)
+        candidates = []
         for i, enemy in enumerate(enemies_list):
             slot_id = i + 1
-            if enemy and enemy.is_alive() and slot_id not in robot.slots_attacked_this_turn:
-                if enemy.force > best_target_strength:
-                    best_target = enemy
-                    best_target_strength = enemy.force
-                    best_target_id = slot_id
+            if enemy and enemy.is_alive() and slot_id not in robot.slots_attacked_this_turn and slot_id not in temp_slots_attacked:
+                candidates.append((slot_id, enemy))
+        
+        if not candidates:
+            break
 
-        # Ataca o alvo escolhido
-        if best_target:
-            print("Robot escolheu como alvo o Slot {} ({}).".format(best_target_id, best_target.type))
-
+        # 2. Escolher o melhor alvo e ataque
+        best_option = None
+        
+        # Avalia cada candidato
+        for slot_id, enemy in candidates:
             attack_to_use = None
+            is_kill = False
             
-            # Se o inimigo for fraco, usa um ataque mais barato para o eliminar
-            if best_target.current_health <= ROBOT_ATTACKS["sound"]["damage"] and robot.energy >= ROBOT_ATTACKS["sound"]["cost"]:
+            # Verifica se consegue matar (prioridade ao mais barato que mata)
+            if enemy.current_health <= ROBOT_ATTACKS["sound"]["damage"] and temp_energy >= ROBOT_ATTACKS["sound"]["cost"]:
                 attack_to_use = "sound"
-                action_callback = sound_attack
-            elif best_target.current_health <= ROBOT_ATTACKS["touch"]["damage"] and robot.energy >= ROBOT_ATTACKS["touch"]["cost"]:
+                is_kill = True
+            elif enemy.current_health <= ROBOT_ATTACKS["touch"]["damage"] and temp_energy >= ROBOT_ATTACKS["touch"]["cost"]:
                 attack_to_use = "touch"
-                action_callback=lambda: touch_attack(tank_pair)
-
-            
-            # Se não, usa o ataque mais forte que puder pagar, mas mantendo uma reserva de 100 de energia
-            elif robot.energy - ROBOT_ATTACKS["crane"]["cost"] > 100:
+                is_kill = True
+            elif enemy.current_health <= ROBOT_ATTACKS["crane"]["damage"] and temp_energy >= ROBOT_ATTACKS["crane"]["cost"]:
                 attack_to_use = "crane"
-                action_callback= lambda: crane_attack(tank_pair, medium_motor, color_sensor)
-            elif robot.energy - ROBOT_ATTACKS["touch"]["cost"] > 100:
-                attack_to_use = "touch"
-                action_callback=lambda: touch_attack(tank_pair)
-            elif robot.energy - ROBOT_ATTACKS["sound"]["cost"] > 100:
-                attack_to_use = "sound"
-                action_callback = sound_attack
-
+                is_kill = True
+            
+            # Se nao mata, escolhe o mais forte possivel mantendo reserva de energia
+            if not is_kill:
+                energy_reserve = 50
+                if temp_energy >= ROBOT_ATTACKS["crane"]["cost"] + energy_reserve:
+                    attack_to_use = "crane"
+                elif temp_energy >= ROBOT_ATTACKS["touch"]["cost"] + energy_reserve:
+                    attack_to_use = "touch"
+                elif temp_energy >= ROBOT_ATTACKS["sound"]["cost"] + energy_reserve:
+                    attack_to_use = "sound"
+            
             if attack_to_use:
-                robot.attack_slot(attack_type=attack_to_use, slot_id=best_target_id, enemies=enemies_list)
-                print("O Robot usou o Ataque '{}' (Custo {}EN) no Inimigo {} do Slot {}, deu {} de dano. Energia restante: {:.0f}.".format(
-                        attack_to_use, ROBOT_ATTACKS[attack_to_use]["cost"], best_target.type, best_target_id, ROBOT_ATTACKS[attack_to_use]["damage"] ,robot.energy
+                # Score: Forca do inimigo + Bonus se matar
+                score = enemy.force
+                if is_kill:
+                    score += 10000
+                
+                # Atualiza a melhor opcao se esta for melhor
+                if best_option is None or score > best_option["score"]:
+                    best_option = {
+                        "slot_id": slot_id,
+                        "enemy": enemy,
+                        "attack": attack_to_use,
+                        "score": score
+                    }
+        
+        if not best_option:
+            # Nao consegue atacar mais ninguem
+            break
+            
+        # 3. Adicionar ao planeamento
+        target = best_option["enemy"]
+        slot = best_option["slot_id"]
+        attack = best_option["attack"]
+        
+        print("Planeamento: Robot vai atacar o Slot {} ({}) com '{}'.".format(slot, target.type, attack))
+        
+        # Atualiza energia temporaria e slots atacados para a proxima iteracao do loop de planeamento
+        temp_energy -= ROBOT_ATTACKS[attack]["cost"]
+        temp_slots_attacked.add(slot)
+
+        # Cria a funcao callback que sera executada quando o robot chegar ao slot
+        # Usamos uma funcao auxiliar para capturar as variaveis no closure corretamente
+        def create_action_callback(atk_type, s_id, tgt_enemy):
+            def callback():
+                if robot.attack_slot(attack_type=atk_type, slot_id=s_id, enemies=enemies_list):
+                    print("O Robot usou o Ataque '{}' (Custo {}EN) no Inimigo {} do Slot {}, deu {} de dano. Energia restante: {:.0f}.".format(
+                        atk_type, ROBOT_ATTACKS[atk_type]["cost"], tgt_enemy.type, s_id, ROBOT_ATTACKS[atk_type]["damage"] ,robot.energy
                     ))
+                    
+                    # Executa o movimento fisico do ataque
+                    if atk_type == "sound":
+                        sound_attack()
+                    elif atk_type == "touch":
+                        touch_attack(tank_pair)
+                    elif atk_type == "crane":
+                        crane_attack(tank_pair, medium_motor, color_sensor)
 
+                    if(not tgt_enemy.is_alive()):
+                        print("O inimigo {} morreu.".format(tgt_enemy.type))
+            return callback
 
-                rotate_perform_action_return(tank_pair=tank_pair,
-                    color_sensor=color_sensor, 
-                    gyro=gyro,
-                    us_sensor=us_sensor, 
-                    spin_speed=spin_speed,
-                    forward_speed=forward_speed,
-                    target_line_index=best_target_id-1,
-                    action_callback=action_callback)
+        scheduled_actions[slot - 1] = create_action_callback(attack, slot, target)
 
-                if(not best_target.is_alive()):
-                    print("O inimigo {} morreu.".format(best_target.type))
-            else:
-                print("O Robot encontrou um alvo, mas decidiu nao atacar. Ficaria com Energia inferior a 100 se atacasse com o Ataque mais barato.")
-        else:
-            print("O Robot nao encontrou alvos validos. Ou ja atacou todos os inimigos neste turno, ou ainda nao existem inimigos ou ja estao todos mortos.")
-
+    # 4. Executar todos os ataques planeados numa unica volta
+    if scheduled_actions:
+        rotate_perform_action_return(tank_pair=tank_pair,
+            color_sensor=color_sensor, 
+            gyro=gyro,
+            us_sensor=us_sensor, 
+            spin_speed=spin_speed,
+            forward_speed=forward_speed,
+            scheduled_actions=scheduled_actions)
     else:
-        print("O Robot esta a conservar energia porque esta abaixo de 200 (Energia atual: {:.0f}EN) e nao vai atacar.".format(robot.energy))
+        print("Robot nao tem energia suficiente para atacar nenhum alvo (ou nao existem alvos).")
