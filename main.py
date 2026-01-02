@@ -45,16 +45,17 @@ def run_game_loop(robot, tank_pair, medium_motor, color_sensor, us_sensor, gyro,
             input(">>> Pressiona ENTER para iniciar o reconhecimento do ambiente do turno {}".format(current_turn))
 
             # Faz reconhecimento do ambiente
-            enemies_log = search_enemies(
-                tank_pair=tank_pair,
-                medium_motor=medium_motor, 
-                color_sensor=color_sensor, 
-                us_sensor=us_sensor, 
-                gyro=gyro,
-                spin_speed=spin_speed,
-                forward_speed=forward_speed,
-                enemies=enemies
-            )
+            if(current_turn <= 6):
+                enemies_log = search_enemies(
+                    tank_pair=tank_pair,
+                    medium_motor=medium_motor, 
+                    color_sensor=color_sensor, 
+                    us_sensor=us_sensor, 
+                    gyro=gyro,
+                    spin_speed=spin_speed,
+                    forward_speed=forward_speed,
+                    enemies=enemies
+                )
 
             # Imprime os resultados do turno
             print("\nResultado do Turno {}: {}".format(current_turn, enemies_log))

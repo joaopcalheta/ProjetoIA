@@ -331,7 +331,8 @@ def rotate_perform_action_return(tank_pair, color_sensor, gyro, us_sensor, spin_
         current_line_index = 0
         scanning = True
         
-        print("A iniciar rotina de rotacao para ataques multiplos. Alvos: {}".format(list(scheduled_actions.keys())))
+        print("A iniciar rotina de rotacao para ataques multiplos. Alvos: ", end="")
+        print([slot + 1 for slot in scheduled_actions.keys()])
         
         # Verifica a posição inicial (linha 0) antes de começar a girar
         check_and_attack(current_line_index)
