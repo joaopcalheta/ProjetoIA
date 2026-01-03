@@ -1,3 +1,5 @@
+# Configuração dos atributos dos inimigos
+# Tipos de inimigos: Tank, Artillery, Infantry baseado na cor detetada pelo sensor de cor do robot
 ENEMY_STATS = {
     "Tank": {
         "color": "Green",
@@ -21,15 +23,15 @@ ENEMY_STATS = {
 
 class Enemy:
 
-    # Inicializa uma nova instância da classe Enemy
-    # Recebe como argumento o tipo de inimigo ("Tank", "Artillery" ou "Infantry") e o turno em que spawnou
+    # Inicializa uma nova unidade baseada no tipo detetado, turno de spawn e posição no tabuleiro (1-6).
     def __init__(self, type, spawn_turn, position):
         
         if type not in ENEMY_STATS:
-            raise ValueError("Erro: O Inimigo '{}' nao existe.".format(type)) # The character 'é' was here.
+            raise ValueError("Erro: O Inimigo '{}' nao existe.".format(type))
             
         stats = ENEMY_STATS[type]
-        
+
+        # Atribuição de atributos baseados no tipo de inimigo.
         self.type = type
         self.color = stats['color']
         self.force = stats['force']
@@ -40,8 +42,8 @@ class Enemy:
         self.position = position
 
 
-    # Recebe dano e atualiza a vida atual do inimigo
-    # Retorna True se o inimigo for morto (vida atual atinge zero ou menos), False caso contrário
+    # Processa o dano recebido após um ataque do robot.
+    # Atualiza a vida e retorna True se a unidade for morta.
     def receive_damage(self, damage):
         self.current_health -= damage
         if self.current_health <= 0:
@@ -54,7 +56,7 @@ class Enemy:
     def is_alive(self):
         return self.current_health > 0
 
-
+    # Define a representação textual do objeto no terminal.
     def __str__(self):
         status = "VIVO" if self.is_alive() else "MORTO"
         

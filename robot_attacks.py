@@ -5,18 +5,22 @@ from ev3dev2.sound import Sound
 
 from config import LINE_COLOR_NAME
 
-# Ataque de som
+# Executa o Ataque de Som.
+# Utiliza o altifalante interno do brick EV3 para emitir um sinal sonoro (beep).
 def sound_attack():
     speaker = Sound()
     speaker.beep()
 
-# Ataque de toque
+# Executa o Ataque de Toque.
+# Simula um impacto físico fazendo o robot recuar brevemente e avançar com velocidade contra o alvo.
 def touch_attack(tank_pair):
     tank_pair.on_for_rotations(SpeedPercent(-55), SpeedPercent(-55), 0.2)
     sleep(0.2)
     tank_pair.on_for_rotations(SpeedPercent(55), SpeedPercent(55), 0.2)
 
-# Ataque de grua
+# Executa o Ataque de Grua.
+# O robot roda 180º para usar a grua para atacar o inimigo 
+# Ativa o motor da arma e regressa à orientação original.
 def crane_attack(tank_pair, weapon_motor, color_sensor):
     
     # Fica de costas para o inimigo (-180º)

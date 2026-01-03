@@ -2,15 +2,17 @@ from ev3dev2.sound import Sound
 import os
 import random
 
-
-
-# Rola dado 
+# Simula o lançamento de um dado digital 
+# Retorna um valor entre 1 e 6
+# Vai ser usado em print_initial_setup para determinar o tipo de unidade e o turno inicial
 def roll_digital_dice():
     return random.randint(1, 6)
 
 
 
-# Imprime a tabela do enunciado preenchida
+# Gera e imprime a tabela de configuração inicial do jogo.
+# Determina aleatoriamente para cada um dos 6 slots, o tipo de inimigo e o turno em que aparecerá.
+# Os tipos são definidos pelo numero do dado: Tanque (1-2), Artilharia (3-4) e Infantaria (5-6).
 def print_initial_setup():
     print("=" * 60)
     print("{:<10} | {:<18} | {:<20}".format("Posicao", "Tipo de atacante", "Turno inicial (1-6)"))
@@ -59,6 +61,10 @@ def background_music_loop(stop_event):
 
 
 
+# Usado para tocar um som especifico
+# win.wav quando o jogador vence
+# defeat.wav quando o jogador perde
+# enemy_down.wav quando um inimigo é derrotado
 def playSound(sound):
     speaker = Sound()
     speaker.play_file(sound, volume=100)

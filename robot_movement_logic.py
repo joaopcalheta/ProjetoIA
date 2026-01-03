@@ -10,7 +10,8 @@ from config import OBJECT_SEARCH_DISTANCE_CM, LINE_COLOR_NAME, SPIN_SEARCH_SPEED
 from tools import background_music_loop
 
 
-# Segue em linha reta com correção do giroscópio
+# Controla o movimento do robot em linha reta utilizando o giroscópio para correções
+# Ajusta a potência de cada motor proporcionalmente ao erro de ângulo detectado
 def follow_straight_on_line(tank_pair, gyro, base_speed, kp, target_angle):
     current_angle = gyro.angle
     correction = current_angle - target_angle
@@ -21,7 +22,8 @@ def follow_straight_on_line(tank_pair, gyro, base_speed, kp, target_angle):
 
 
 
-# Gira o robô para a esquerda ou direita
+# Gira o robot em busca de alvos ou da linha vermelha
+# Monitora simultaneamente o sensor de cor (para encontrar a linha) e o ultrassónico (para detectar inimigos)
 def perform_search_spin(tank_pair, color_sensor, us_sensor, duration_s, left_speed, right_speed, distance_check_func):
     tank_pair.on(SpeedPercent(left_speed), SpeedPercent(right_speed))
     start_search_time = time()
@@ -37,10 +39,11 @@ def perform_search_spin(tank_pair, color_sensor, us_sensor, duration_s, left_spe
 
 
 # Reorienta o robot quando perde a linha vermelha
+# Realiza uma busca alternada (esquerda e depois direita) até reencontrar a linha vermelha no solo
 def search_for_lost_line(tank_pair, color_sensor, us_sensor, gyro, distance_check_func):
     tank_pair.off()
     
-    # Procura à esquerda
+    # Procura primeiro à esquerda
     search_result = perform_search_spin(
         tank_pair, color_sensor, us_sensor,
         duration_s=SEARCH_TIME_LEFT_S,
@@ -77,18 +80,18 @@ def search_for_lost_line(tank_pair, color_sensor, us_sensor, gyro, distance_chec
         return 'TARGET_REACHED'
     
     # Não encontrou a linha à direita, nem à esquerda
-    print("Perdi-me! Nao consigo encontrar a linha vermelha!") # O 'ã' em 'Nao' foi removido para evitar erros de codificacao.
+    print("Perdi-me! Nao consigo encontrar a linha vermelha!")
     return 'NOT_FOUND'
 
 
 
-# Deixa a linha vermelha
+# Força o robot a rodar para fora da linha atual.
 def leave_current_line(tank_pair, color_sensor, spin_speed):
     tank_pair.on(left_speed=SpeedPercent(spin_speed * -1), right_speed=SpeedPercent(spin_speed))
 
 
 
-# Regressa ao centro após se aproximar do inimigo
+# Faz o robot regressar a uma certa distância do inimigo após cobrir a cor do inimigo
 def follow_line_return_to_distance(tank_pair, gyro, color_sensor, us_sensor, return_speed, kp, target_distance_cm):
     gyro.reset()
     target_angle = 0
@@ -115,13 +118,15 @@ def follow_line_return_to_distance(tank_pair, gyro, color_sensor, us_sensor, ret
 
 
 
-# Aproxima-se do inimigo até chegar a uma certa distância
+# Conduz o robot em direção ao inimigo seguindo a linha vermelha em 2 fases:
+# Fase 1 - Ficar a dist_phase_1 do inimigo (antes de chegar à cor do inimigo)
+# Fase 2 - Ficar a dist_phase_2 do inimigo (após cobrir cor do inimigo)
 def follow_line_until_obstacle(tank_pair, gyro, color_sensor, us_sensor, base_speed, kp):
     
-    dist_phase_1 = 15   # Distância para ficar do inimigo antes de chegar à cor do inimigo (cartolina no chão à frente do inimigo)
-    dist_phase_2 = 8    # Distância para ficar do inimigo após cobrir a cor do inimigo (cartolina no chão à frente do inimigo)
+    dist_phase_1 = 15   # Distância até ao inimigo antes de chegar à cor do inimigo
+    dist_phase_2 = 8    # Distância até ao inimigo após cobrir a cor do inimigo
     
-    # Fase 1 - Ficar a dist_phase_1 do inimigo (antes de chegar à cor do inimigo)
+    # Fase 1
     gyro.reset()
     target_angle = 0
     while us_sensor.distance_centimeters > dist_phase_1:
@@ -139,7 +144,7 @@ def follow_line_until_obstacle(tank_pair, gyro, color_sensor, us_sensor, base_sp
                 break 
         sleep(0.01)
 
-    # Fase 2 - Ficar a dist_phase_2 do inimigo (após cobrir cor do inimigo)
+    # Fase 2
     gyro.reset() 
     while us_sensor.distance_centimeters > dist_phase_2:
         current_angle = gyro.angle
@@ -153,8 +158,10 @@ def follow_line_until_obstacle(tank_pair, gyro, color_sensor, us_sensor, base_sp
     tank_pair.off()
 
 
-
-# Faz o reconhecimento do ambiente do novo turno
+# Realiza o reconhecimento circular do campo no início de cada turno.
+# Aproxima-se a cada inimigo detetado, regista a cor do inimigo e depois recua para o centro.
+# Apenas aproxima dos inimigos que ainda não foram registados, ou seja, que estão marcados como None na lista de inimigos.
+# Retorna uma lista com as cores dos inimigos detetados em cada um dos 6 slots.
 def search_enemies(tank_pair, medium_motor, color_sensor, us_sensor, gyro, spin_speed, forward_speed, enemies):
 
     KP_GAIN = 1.5
@@ -179,35 +186,27 @@ def search_enemies(tank_pair, medium_motor, color_sensor, us_sensor, gyro, spin_
         while scanning:
             
             if not is_start_position:
-
                 gyro.reset()
-                
-                # Sai da linha atual
                 tank_pair.on(left_speed=SpeedPercent(spin_speed * -1), right_speed=SpeedPercent(spin_speed))
                 sleep(0.5) 
-
                 # Roda até encontrar a próxima linha
                 while color_sensor.color_name != LINE_COLOR_NAME:
                     sleep(0.01)
                 tank_pair.off()
-
-                # Acumula angulo da deslocação
                 segment_angle = abs(gyro.angle)
                 accumulated_angle += segment_angle
-
                 print("Angulo percorrido: {}".format(segment_angle))
 
+                # Lógica para detectar se o robot saltou linhas baseado no ângulo percorrido.
                 SKIPPED_LINE_ANGLE_THRESHOLD = 90
                 EXPECTED_SEGMENT_ANGLE = 60
                 
-                # Se o ângulo for muito grande, o robot calcula as linhas que saltou
                 if segment_angle > SKIPPED_LINE_ANGLE_THRESHOLD and current_line_index < 5:
                     num_skipped = round(segment_angle / EXPECTED_SEGMENT_ANGLE) - 1
-                    if num_skipped > 0: # O 'ú' em 'angulo' foi removido para evitar erros de codificacao.
+                    if num_skipped > 0:
                         print("O angulo percorrido {} e muito grande. Foi assumido que o robot saltou {} linha(s).".format(segment_angle, num_skipped))
                         current_line_index += num_skipped
 
-                # Se o ângulo acumulado for superior a 340 e as linhas contadas forem igual a 6, o robot para a pesquisa 
                 if accumulated_angle >= FULL_TURN_MIN_ANGLE or current_line_index == 6:
                     print("O Robot realizou uma volta completa.")
                     scanning = False
@@ -216,6 +215,9 @@ def search_enemies(tank_pair, medium_motor, color_sensor, us_sensor, gyro, spin_
             sleep(0.1)
             distance_cm = us_sensor.distance_centimeters 
             
+            # Verifica se o slot atual ja foi registado
+            # Se ja foi registado, apenas avança para o próximo slot
+            # Se não foi registado, aproxima,verifica se há um inimigo e regista a cor
             if distance_cm < OBJECT_SEARCH_DISTANCE_CM:
                 print("Inimigo detetado a {}cm (Slot {})".format(distance_cm, current_line_index + 1))
                 if(enemies[current_line_index] is None):
@@ -231,7 +233,7 @@ def search_enemies(tank_pair, medium_motor, color_sensor, us_sensor, gyro, spin_
                     if current_line_index < 6:
                         enemies_log[current_line_index] = detected_color
                     
-                    # Regressa ao centro
+                    # Regressa ao centro para continuar a busca dos restantes slots
                     return_speed = forward_speed * -1
                     follow_line_return_to_distance(
                         tank_pair=tank_pair, gyro=gyro, color_sensor=color_sensor,
@@ -246,6 +248,7 @@ def search_enemies(tank_pair, medium_motor, color_sensor, us_sensor, gyro, spin_
             is_start_position = False
             current_line_index += 1
             
+            # Completa a volta após 6 slots
             if current_line_index >= 6:
                 print("Numero de slots alcancado. A regressar ao inicio...")
 
@@ -264,31 +267,28 @@ def search_enemies(tank_pair, medium_motor, color_sensor, us_sensor, gyro, spin_
         tank_pair.off()
 
 
-
+# Realiza a sequencia de combate: rotação até ao slot do inimigo-alvo, aproximação, ataque e regresso ao centro
 # Gira o robot no centro do campo de batalha até encontrar a linha do slot alvo.
-# Uma vez na linha correta, avança em direção ao inimigo, executa uma ação (ataque) e depois regressa à sua posição inicial no centro.
 def rotate_perform_action_return(tank_pair, color_sensor, gyro, us_sensor, spin_speed, forward_speed, scheduled_actions):
 
     FULL_TURN_MIN_ANGLE = 340           # Ângulo mínimo para considerar que o robot deu uma volta completa
     SKIPPED_LINE_ANGLE_THRESHOLD = 90   # Ângulo acima do qual o robot considera que saltou uma ou mais linhas
     EXPECTED_SEGMENT_ANGLE = 60         # Ângulo esperado entre duas linhas consecutivas
-    KP_GAIN = 1.5                 
+    KP_GAIN = 1.5                       # Ganho proporcional para correção de trajetória
 
-    # Funcao para atacar
+
+    # Verifica se o índice do slot atual esta na lista de acoes agendadas
+    # Realiza o ataque ao inimigo no slot atual
     def check_and_attack(current_idx):
-       
-        # Verifica se o índice da linha atual esta na lista de acoes agendadas
         if current_idx in scheduled_actions:
             print("Linha {} (Alvo) alcancada. A verificar se existe inimigo...".format(current_idx))
-            
+        
             sleep(0.1) 
             distance_cm = us_sensor.distance_centimeters
-            
-            # Se um objeto for detetado dentro da distância definida, inicia a sequência de ataque
+
             if distance_cm < OBJECT_SEARCH_DISTANCE_CM:
                 print("Inimigo detetado a {}cm. A aproximar...".format(distance_cm)) 
                 
-                # Avança em direção ao inimigo
                 follow_line_until_obstacle(
                     tank_pair=tank_pair, 
                     gyro=gyro, 
@@ -297,14 +297,12 @@ def rotate_perform_action_return(tank_pair, color_sensor, gyro, us_sensor, spin_
                     base_speed=forward_speed, 
                     kp=KP_GAIN
                 )
-                
                 tank_pair.off()
                 sleep(0.5)
 
-                # Executa a ação de ataque passada como callback
+                # Executa o callback de ataque (definido em robot_heal_attack_logic.py).
                 scheduled_actions[current_idx]()
                 
-                # Recua para a distância original para se preparar para a próxima rotação
                 return_speed = forward_speed * -1
                 follow_line_return_to_distance(
                     tank_pair=tank_pair, 
@@ -325,8 +323,6 @@ def rotate_perform_action_return(tank_pair, color_sensor, gyro, us_sensor, spin_
     try:
         gyro.reset()
         tank_pair.off()
-        
-        # Variáveis para controlar a rotação e a posição
         accumulated_angle = 0
         current_line_index = 0
         scanning = True
@@ -334,30 +330,27 @@ def rotate_perform_action_return(tank_pair, color_sensor, gyro, us_sensor, spin_
         print("A iniciar rotina de rotacao para ataques multiplos. Alvos: ", end="")
         print([slot + 1 for slot in scheduled_actions.keys()])
         
-        # Verifica a posição inicial (linha 0) antes de começar a girar
+        # Verifica se o primeiro slot é um alvo antes de iniciar o loop de rotação
         check_and_attack(current_line_index)
 
-        # Loop principal para girar e encontrar as linhas
+        # Loop de rotação e ataque nos slots agendados
+        # Condição de paragem: se o robot deu uma volta completa ou passou por todas as 6 linhas
         while scanning:
             
-            # Condição de paragem: se o robot deu uma volta completa ou passou por todas as 6 linhas
             if accumulated_angle >= FULL_TURN_MIN_ANGLE or current_line_index >= 6:
                 print("Volta completa. De regresso a posicao inicial.")
                 break
 
             gyro.reset()
             
-            # Gira para sair da linha atual
             tank_pair.on(left_speed=spin_speed * -1, right_speed=spin_speed)
             sleep(0.5) 
 
-            # Continua a girar até o sensor de cor detetar a próxima linha vermelha
             while color_sensor.color_name != LINE_COLOR_NAME:
                 sleep(0.01)
             
             tank_pair.off()
 
-            # Calcula o ângulo percorrido para chegar à nova linha
             segment_angle = abs(gyro.angle)
             accumulated_angle += segment_angle
             
@@ -371,7 +364,7 @@ def rotate_perform_action_return(tank_pair, color_sensor, gyro, us_sensor, spin_
             current_line_index += 1
             print("Chegou a Linha {}".format(current_line_index)) 
             
-            # Verifica se a linha atual é o alvo e ataca se for
+            # Verifica se a linha atual é o alvo e ataca se for um alvo agendado
             check_and_attack(current_line_index)
             
     except KeyboardInterrupt:

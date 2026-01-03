@@ -8,43 +8,40 @@ from initialize_robot_enemies import initialize_robot, initialize_enemies_by_col
 from robot_movement_logic import search_enemies
 from config import (OBSTACLE_STOP_DISTANCE_CM, OBJECT_SEARCH_DISTANCE_CM, LINE_COLOR_NAME, SPIN_SEARCH_SPEED, SEARCH_TIME_LEFT_S, SEARCH_TIME_RIGHT_S)
 
+# Array global para armazenar os inimigos encontrados nas 6 posições disponiveis
+enemies = [None] * 6      
 
-enemies = [None] * 6      # Array global para armazenar os inimigos
 
-
-# Loop principal do jogo
+# Loop principal do jogo que controla a progressão do jogo turno a turno
+# Realiza o reconhecimento do ambiente até ao turno 6 (ultimo turno em que surgem novos inimigos)
+# Recupera a energia do robot, reseta os ataques e curas usadas no turno anterior
+# Realiza a fase de ataque dos inimigos no inicio de cada turno (inimigos que o robot não matou)
+# Realiza a fase de ataque e cura do robot
+# Verifica se o jogo já terminou no final dos ataques do robot e depois dos ataques dos inimigos
 def run_game_loop(robot, tank_pair, medium_motor, color_sensor, us_sensor, gyro, spin_speed, forward_speed):
     
     current_turn = 1
-
-
     try:
         while True:
             print("\n=== TURNO {} ===".format(current_turn))
             if(current_turn != 1):
-                # Robot recupera 50% da energia
-                # Reset aos ataques feitos e cura do turno anterior
                 robot.start_new_turn()
                 print("ROBOT RECUPERA 50% DE ENERGIA E DA RESET NOS REGISTOS DE ATAQUES E CURAS DO TURNO ANTERIOR")
                 print("Energia do Robot: {:.0f}EN".format(robot.energy))
                 
-                # Inimigos do turno anterior que o robot não conseguiu matar atacam
                 print("FASE DE ATAQUE DOS INIMIGOS")
                 enemy_attack_phase(robot, enemies, current_turn)
                 print("Vida do Robot: {:.0f}HP".format(robot.current_health))
 
 
 
-            # Verifica se o jogo terminou
             game_status = check_game_status(robot, enemies)
             if((current_turn > 6 and game_status == "victory") or game_status == "defeat"):
                 handle_game_over(game_status)
                 break
-
-            # Aguarda pelo ENTER do utilizador para iniciar o reconhecimento do ambiente do novo turno
+            
             input(">>> Pressiona ENTER para iniciar o reconhecimento do ambiente do turno {}".format(current_turn))
 
-            # Faz reconhecimento do ambiente
             if(current_turn <= 6):
                 enemies_log = search_enemies(
                     tank_pair=tank_pair,
@@ -57,19 +54,14 @@ def run_game_loop(robot, tank_pair, medium_motor, color_sensor, us_sensor, gyro,
                     enemies=enemies
                 )
 
-            # Imprime os resultados do turno
             print("\nResultado do Turno {}: {}".format(current_turn, enemies_log))
-            
-            # Atualiza o array global 'enemies' com novos inimigos encontrados.
-            # Não substitui inimigos que já existem.
             new_enemies_list = initialize_enemies_by_color(enemies_log, current_turn)
             
             for i, new_enemy in enumerate(new_enemies_list):
                 if enemies[i] is None and new_enemy is not None:
                     print("Novo inimigo adicionado na Posicao {}".format(i))
-                    enemies[i] = new_enemy # Adiciona a nova instância
+                    enemies[i] = new_enemy
             
-            # Imprime o estado atual do campo de batalha
             print("\n--- Campo de Batalha Atual (Turno {}) ---".format(current_turn))
             for i, enemy in enumerate(enemies):
                 if enemy is None:
@@ -77,7 +69,6 @@ def run_game_loop(robot, tank_pair, medium_motor, color_sensor, us_sensor, gyro,
                 else:
                     print("Posicao {}: {}".format(i+1, enemy))
 
-            # Robot utiliza a cura e ataques que pode fazer no turno
             print("FASE DE ATAQUE / CURA DO ROBOT")
             robot_turn_logic(
                 tank_pair=tank_pair,
@@ -90,7 +81,6 @@ def run_game_loop(robot, tank_pair, medium_motor, color_sensor, us_sensor, gyro,
                 robot=robot, 
                 enemies_list=enemies)
             
-             # Imprime o estado atual do campo de batalha
             print("\n--- Campo de Batalha Apos Ataques (Turno {}) ---".format(current_turn))
             for i, enemy in enumerate(enemies):
                 if enemy is None:
@@ -98,14 +88,11 @@ def run_game_loop(robot, tank_pair, medium_motor, color_sensor, us_sensor, gyro,
                 else:
                     print("Posicao {}: {}".format(i+1, enemy))
 
-
-
             game_status = check_game_status(robot, enemies)
             if((current_turn > 6 and game_status == "victory") or game_status == "defeat"):
                 handle_game_over(game_status)
                 break
             
-            # Avança para o próximo turno
             current_turn += 1
             print("-" * 30)
 
@@ -117,16 +104,20 @@ def run_game_loop(robot, tank_pair, medium_motor, color_sensor, us_sensor, gyro,
         tank_pair.off()
         medium_motor.off()
 
+
+
+# Inicializa o hardware do robot
+# Imprime a tabela inicial de configuração do robot e inimigos
+# Inicia o loop principal do jogo
 def main():
 
     tank_pair, medium_motor, color_sensor, us_sensor, gyro_sensor = initialize_hardware()
     
     if tank_pair is not None:
         
-        robot = initialize_robot()      # Cria a instância do robot
-        print_initial_setup()           # Imprime a tabela do enunciado preenchida 
+        robot = initialize_robot()
+        print_initial_setup() 
         
-        # Loop principal do jogo
         run_game_loop(
             robot=robot,
             tank_pair=tank_pair,

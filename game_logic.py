@@ -20,7 +20,8 @@ def check_game_status(robot, enemies_list):
 
 
 
-# Informa do fim de jogo
+# Imprime a mensagem de fim de jogo com base no estado do jogo
+# Toca o som apropriado para vitória ou derrota
 def handle_game_over(game_status):
     if game_status == "victory":
         playSound("win.wav")

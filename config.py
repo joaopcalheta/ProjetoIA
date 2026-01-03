@@ -1,4 +1,5 @@
 # Constantes de movimento e deteção
+# Define os limites físicos de operação do robot no campo de batalha.
 OBSTACLE_STOP_DISTANCE_CM = 8      # Distância para parar à frente do inimigo
 OBJECT_SEARCH_DISTANCE_CM = 40     # Distância para considerar "inimigo encontrado"
 LINE_COLOR_NAME = 'Red'            # Cor da linha a seguir

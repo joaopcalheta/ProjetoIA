@@ -13,7 +13,9 @@ from robot_movement_logic import search_enemies
 from robot_heal_attack_logic import robot_turn_logic
 from enemy_attack_logic import enemy_attack_phase
 
-# Inicializa o robot
+
+# Instancia o objeto principal do Robot.
+# Cria a entidade do jogador com os atributos iniciais de vida e energia definidos na classe Robot.
 def initialize_robot():
     robot = Robot()
     print("Robot inicializado com {:.0f}HP e {:.0f}EN.".format(robot.current_health, robot.energy))
@@ -21,7 +23,9 @@ def initialize_robot():
 
 
 
-# Cria um array de instâncias de inimigos correspondentes ao array de cores detetados no ambiente pelo robot
+# Converte uma lista de cores (detetadas pelos sensores) em instâncias da classe Enemy.
+# Mapeia as cores lidas pelo sensor de cor para tipos específicos de unidades inimigas.
+# Faz o ajuste de "Yellow" para "Brown" devido à limitação do sensor.
 def initialize_enemies_by_color(color_list, current_turn):
     enemy_object_list = []
 

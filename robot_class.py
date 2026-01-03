@@ -1,22 +1,28 @@
-ROBOT_MAX_HEALTH = 750
-ROBOT_MAX_ENERGY = 500
-ENERGY_RECOVERY_PERCENT = 0.5
+# Configurações Base do robot
+ROBOT_MAX_HEALTH = 750              # Vida máxima do robot
+ROBOT_MAX_ENERGY = 500              # Energia máxima do robot
+ENERGY_RECOVERY_PERCENT = 0.5       # Ganho de energia por turno (50% da energia atual)
 
+
+# Ataques Disponíveis
+# Define o dano infligido e o custo de energia para cada tipo de ataque físico.
 ROBOT_ATTACKS = {
-    "crane" : {
+    "crane" : {             # Ataque de grua
         "damage": 200, 
         "cost": 300
         },
-    "touch" : {
+    "touch" : {             # Ataque de toque
         "damage": 100, 
         "cost": 150
         },
-    "sound" : {
+    "sound" : {             # Ataque som
         "damage": 50, 
         "cost": 50
         }
 }
 
+# Tipos de Cura Disponíveis
+# Define a quantidade de vida recuperada e o custo de energia necessário.
 ROBOT_HEALS = {
     "heal1": {
         "health_recovered": 100, 
@@ -36,13 +42,17 @@ ROBOT_HEALS = {
 class Robot:
 
     def __init__(self):
+        # Inicializa o estado do robot com os valores máximos e limpa os registos de turno.
         self.current_health = ROBOT_MAX_HEALTH
         self.energy = ROBOT_MAX_ENERGY
         self.max_health = ROBOT_MAX_HEALTH
         self.heal_used_this_turn = False
         self.slots_attacked_this_turn = set()
 
-    # Rotina de início de truno
+    # Rotina de início de turno
+    # Recupera energia baseado na energia atual 
+    # Verifica se não vai ultrapassar a energia máxima
+    # Reseta os registos de cura e ataques do turno
     def start_new_turn(self):
         recovered_energy = self.energy * ENERGY_RECOVERY_PERCENT
         self.energy += recovered_energy
@@ -53,7 +63,9 @@ class Robot:
         self.heal_used_this_turn = False
         self.slots_attacked_this_turn.clear()
 
+
     # Ataca um inimigo num slot específico
+    # Valida o tipo de ataque, o slot, se o alvo existe e se há energia suficiente.
     # Retorna True se o ataque for bem-sucedido, False caso contrário
     def attack_slot(self, attack_type, slot_id, enemies):
 
@@ -89,16 +101,19 @@ class Robot:
             return False
 
         # Realiza o ataque  
+        # Reduz a energia do robot
+        # Dá dano no inimigo 
         self.energy -= cost
         target_enemy.receive_damage(damage)
 
-        # Regista que esse slot já foi atacado neste turno
+        # Adiciona o slot à lista de slots atacados no turno para evitar ataques múltiplos no mesmo slot
         self.slots_attacked_this_turn.add(slot_id)
         return True
 
 
 
     # Cura o robot
+    # Verifica se já houve cura no turno, se o tipo é válido e se há energia.
     # Retorna True se a cura for bem-sucedida, False caso contrário
     def heal(self, heal_type):
 
@@ -123,6 +138,8 @@ class Robot:
             return False
             
         # Realiza a cura
+        # Reduz a energia do robot
+        # Aumenta a vida atual do robot, sem ultrapassar a vida máxima
         self.energy -= cost
         self.current_health += health_recovered
         if self.current_health > self.max_health:
@@ -134,9 +151,8 @@ class Robot:
         return True
 
 
-
-    # Recebe dano e atualiza a vida atual do robot
-    # Retorna True se o inimigo for morto (vida atual atinge zero ou menos), False caso contrário
+    # Recebe dano dos inimigos e atualiza a vida do robot
+    # Retorna True se o robot morrer (vida menor ou igual a 0), False esteja vivo
     def receive_damage(self, damage):
         self.current_health -= damage
         if self.current_health < 0:
@@ -147,7 +163,6 @@ class Robot:
         ))
         
         return self.current_health == 0
-
 
 
     # Verifica se o robot ainda está vivo
