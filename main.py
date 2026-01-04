@@ -129,25 +129,6 @@ def main():
             forward_speed=-20
         )
 
-        # # --- Processar e imprimir o relatório final de inimigos ---
-        # print("\n" + "="*40)
-        # print("--- RELATORIO FINAL DE INIMIGOS ---")
-        # for i, color in enumerate(enemies_log):
-        #     position = i + 1
-        #     if color == "Empty":
-        #         print("Posicao {}: Vazio".format(position)) # O 'ç' em 'Posicao' foi removido para evitar erros de codificacao.
-        #     else:
-        #         found_enemy = False
-        #         # Procura no dicionário importado qual inimigo corresponde à cor
-        #         for enemy_type, stats in INIMIGO_STATS.items():
-        #             if stats['cor'] == color:
-        #                 print("Posicao {}: Encontrado - {}".format(position, enemy_type)) # O 'ç' em 'Posicao' foi removido para evitar erros de codificacao.
-        #                 found_enemy = True
-        #                 break
-        #         if not found_enemy:
-        #             # Lida com cores detetadas mas não definidas no dicionário
-        #             print("Posicao {}: Inimigo de cor desconhecida ({})".format(position, color)) # O 'ç' em 'Posicao' foi removido para evitar erros de codificacao.
-        # print("="*40)
     
     else:
         print("Falha ao inicializar hardware. A sair...")
