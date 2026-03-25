@@ -4,7 +4,7 @@
 
 O **Defender-Bot** é um sistema de inteligência artificial desenvolvido para atuar como um robô de defesa em um cenário de combate simulado. O objetivo principal é programar um robô que, em um ambiente de 13 turnos, consiga reconhecer forças inimigas, planear ataques e curas estratégicas, e sobreviver ao ataque combinado de diferentes unidades inimigas (tanques, artilharia e infantaria). O projeto visa aplicar conceitos de heurísticas, tomada de decisão e controlo de ações em tempo real, usando técnicas de IA para otimizar a sobrevivência do robô.
 
-![Robo pic](./1.jpeg)
+![Robo Pic](./1.jpeg)
 
 ## Conceitos Teóricos
 
