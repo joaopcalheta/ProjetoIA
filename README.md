@@ -4,7 +4,9 @@
 
 O **Defender-Bot** é um sistema de inteligência artificial desenvolvido para atuar como um robô de defesa em um cenário de combate simulado. O objetivo principal é programar um robô que, em um ambiente de 13 turnos, consiga reconhecer forças inimigas, planear ataques e curas estratégicas, e sobreviver ao ataque combinado de diferentes unidades inimigas (tanques, artilharia e infantaria). O projeto visa aplicar conceitos de heurísticas, tomada de decisão e controlo de ações em tempo real, usando técnicas de IA para otimizar a sobrevivência do robô.
 
-## Áreas Tocadas
+![Robo pic](./1.jpeg)
+
+## Conceitos Teóricos
 
 Este projeto envolve várias áreas de inteligência artificial e programação, incluindo:
 
@@ -26,7 +28,18 @@ O projeto foi desenvolvido em Python, utilizando a plataforma EV3 com o sistema 
 python3 main.py
 ```
 
-O programa inicia o ciclo de reconhecimento, ataque, cura e decisão, turno a turno, até ao fim do jogo ou interrupção manual.
+O programa executa, turno a turno, um ciclo contínuo de reconhecimento, ataque, cura e tomada de decisão, mantendo-se ativo até ao final do jogo ou até ser interrompido manualmente.
+
+O robô deve ser posicionado no centro de um ambiente semelhante ao ilustrado nas imagens. Esse ambiente deve incluir fitas de cor vermelha dispostas nas diagonais entre cada ponto de spawn de inimigos, para permitir ao robot orientar-se ao longo das suas ações.
+
+Cada tipo de inimigo é identificado por uma cor específica, colocada junto ao respetivo objeto em cada ponto de spawn:
+- Tanque: cor verde
+- Artilharia: cor amarela
+- Infantaria: cor azul
+
+![Robo Environment Size](./2.jpeg)
+
+![Robo Environment Action](./3.jpeg)
 
 ## Detalhes do Projeto
 
@@ -39,12 +52,21 @@ O programa inicia o ciclo de reconhecimento, ataque, cura e decisão, turno a tu
   - Cura 1 (100 uv, 200 en)
   - Cura 2 (200 uv, 300 en)
   - Cura 3 (400 uv, 400 en)
-- **Heurísticas:** desenvolvidas para ajudar o robô a avaliar o potencial de dano de cada inimigo, tendo em conta a sua força, vida atual e tipo. É calculado a ameaça de cada inimigo com base no dano que pode causar, considerando a sua força e a percentagem de vida restante. Assim, o robô consegue priorizar os inimigos mais perigosos. Quando o robô vai realizar um ataque, a heurística estima o dano que seria causado e compara-o com a ameaça atual do inimigo. Também calcula a eficiência do ataque, avaliando o dano que seria evitado em relação ao custo energético do ataque. Além disso, a heurística atribui bónus para ataques a inimigos mais perigosos, como artilharia e tanques, e por eliminar inimigos, enquanto penaliza ataques que causam dano excessivo (overkill). O objetivo é garantir que o robô ataque as maiores ameaças de forma eficiente, sem desperdiçar energia desnecessária e garantindo a sua sobrevivência. Assim, a prioridade de ataque é ajustada de forma dinâmica, dependendo da ameaça real de cada inimigo.
+- **Heurística:**
+A heurística foi desenvolvida para permitir ao robô avaliar de forma inteligente o potencial de dano de cada inimigo, considerando a sua força, tipo e vida atual. A ameaça de cada inimigo é calculada com base no dano que pode infligir, tendo em conta a sua força e a percentagem de vida restante. Com isso, o robô consegue priorizar os adversários mais perigosos.
 
-## Avaliação e Nota
+No momento de ataque, a heurística realiza as seguintes avaliações:
+
+1. **Estimativa de dano:** calcula o dano que seria causado ao inimigo e compara-o com a sua ameaça atual.
+2. **Eficiência do ataque:** avalia o dano evitado em relação ao custo energético necessário para executar o ataque.
+3. **Bónus e penalizações:** atribui bónus a ataques dirigidos a inimigos de maior risco, como artilharia e tanques, e à eliminação de inimigos. Penaliza ataques que resultem em dano excessivo (overkill), evitando desperdício de energia.
+
+O objetivo é garantir que o robô atue de forma eficiente, atacando as maiores ameaças com o menor custo possível, preservando energia e maximizando a sua sobrevivência. Assim, a prioridade de ataque é ajustada dinamicamente, dependendo da ameaça real de cada inimigo.
+
+## Avaliação
 
 Este projeto recebeu uma nota final de **17,5 valores** na disciplina de Inteligência Artificial, na Universidade da Madeira, sob orientação do professor Eduardo Fermé.
 
 ## Considerações Finais
 
-Este trabalho demonstra a integração de sensores, controlo de hardware, lógica de decisão baseada em heurísticas e estratégias de IA para um cenário de combate simulado. O código está organizado em módulos que representam classes de inimigos, o robô, ataques e lógica de jogo.
+Este trabalho integra sensores, controlo de hardware, heurísticas e estratégias de IA num cenário de combate simulado. O robô detecta inimigos com sensores ultrassónicos e de cor, prioriza ameaças e decide ataques de forma eficiente. O código modular permite fácil manutenção e expansão, combinando navegação, reconhecimento e tomada de decisão autónoma, demonstrando aplicação prática de robótica inteligente e otimização de recursos.
